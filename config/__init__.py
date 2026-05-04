@@ -25,6 +25,10 @@ class Config:
         )
     )
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        "pool_pre_ping": True,   # rileva connessioni SSL stantie (fix PgBouncer/Supabase)
+        "pool_recycle": 300,     # ricicla connessioni ogni 5 minuti
+    }
 
     # Primo admin — creato automaticamente se il DB è vuoto
     ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "admin")
