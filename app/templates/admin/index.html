@@ -1,0 +1,402 @@
+{% extends "base.html" %}
+{% block title %}Admin{% endblock %}
+{% block page_title %}Pannello Amministrazione{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- ── Header banner ── -->
+  <div class="gradient-banner">
+    <div class="relative z-10 flex items-start justify-between">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <i data-lucide="shield-check" class="w-5 h-5 text-white/80"></i>
+          <span class="text-[11px] font-semibold tracking-widest uppercase text-white/50">Amministrazione</span>
+        </div>
+        <h2 class="text-xl font-bold text-white">Gestione Utenti &amp; Dati</h2>
+        <p class="text-white/55 text-sm mt-0.5">Utenti, permessi, upload Excel, stato cache</p>
+      </div>
+      <a href="{{ url_for('admin.user_new') }}"
+        class="flex items-center gap-2 px-4 py-2 bg-white/15 hover:bg-white/25 text-white text-sm font-medium rounded-xl transition-all">
+        <i data-lucide="user-plus" class="w-4 h-4"></i>
+        Nuovo utente
+      </a>
+    </div>
+    <div class="absolute right-6 top-4 w-20 h-20 rounded-full bg-white/5 blur-sm"></div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       UTENTI
+  ══════════════════════════════════════════════════════ -->
+  <div>
+    <div class="section-title">
+      <i data-lucide="users" class="w-3 h-3"></i>
+      Utenti ({{ users|length }})
+    </div>
+    <div class="kpi-card overflow-x-auto">
+      <table class="dark-table w-full">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Ruolo</th>
+            <th>Moduli abilitati</th>
+            <th>Target</th>
+            <th>Aziende</th>
+            <th>Stato</th>
+            <th>Creato</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr class="{{ 'opacity-50' if not u.is_active else '' }}">
+
+            <td class="font-medium text-white/85">
+              {{ u.username }}
+              {% if u.id == current_user.id %}
+                <span class="ml-1 badge badge-accent text-[9px]">Tu</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if u.is_admin %}
+                <span class="badge badge-warning">Admin</span>
+              {% else %}
+                <span class="badge badge-muted">Utente</span>
+              {% endif %}
+            </td>
+
+            <td>
+              {% if u.is_admin %}
+                <span class="text-white/40 text-xs italic">Tutti</span>
+              {% elif u.modules %}
+                <div class="flex flex-wrap gap-1">
+                  {% for m in u.modules %}
+                    <span class="badge badge-accent text-[9px]">{{ m }}</span>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <span class="text-white/25 text-xs">—</span>
+              {% endif %}
+            </td>
+
+            <td class="text-white/50 text-xs">
+              {% if u.is_admin or not u.targets %}
+                <span class="italic text-white/30">Tutti</span>
+              {% else %}
+                {{ u.targets|join(', ') }}
+              {% endif %}
+            </td>
+
+            <td class="text-white/50 text-xs">
+              {% if u.is_admin or not u.aziende %}
+                <span class="italic text-white/30">Tutte</span>
+              {% else %}
+                {{ u.aziende|join(', ') }}
+              {% endif %}
+            </td>
+
+            <td>
+              {% if u._is_active %}
+                <span class="flex items-center gap-1.5 text-xs text-success">
+                  <span class="w-1.5 h-1.5 bg-success rounded-full"></span> Attivo
+                </span>
+              {% else %}
+                <span class="flex items-center gap-1.5 text-xs text-white/30">
+                  <span class="w-1.5 h-1.5 bg-white/20 rounded-full"></span> Disabilitato
+                </span>
+              {% endif %}
+            </td>
+
+            <td class="text-white/35 text-xs whitespace-nowrap">
+              {{ u.created_at.strftime('%d/%m/%Y') }}
+            </td>
+
+            <td>
+              <div class="flex items-center gap-2">
+                <a href="{{ url_for('admin.user_edit', user_id=u.id) }}"
+                  class="p-1.5 rounded-lg bg-white/5 hover:bg-accent/20 text-white/40 hover:text-accent transition-all"
+                  title="Modifica">
+                  <i data-lucide="pencil" class="w-3.5 h-3.5"></i>
+                </a>
+
+                {% if u.id != current_user.id %}
+                  <form method="POST" action="{{ url_for('admin.user_toggle', user_id=u.id) }}" class="inline">
+                    <button type="submit"
+                      class="p-1.5 rounded-lg bg-white/5 hover:bg-warning/20 text-white/40 hover:text-warning transition-all"
+                      title="{{ 'Disabilita' if u._is_active else 'Abilita' }}">
+                      <i data-lucide="{{ 'pause-circle' if u._is_active else 'play-circle' }}" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </form>
+                  <form method="POST" action="{{ url_for('admin.user_delete', user_id=u.id) }}" class="inline"
+                    onsubmit="return confirm('Eliminare l\'utente {{ u.username }}? Operazione irreversibile.')">
+                    <button type="submit"
+                      class="p-1.5 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/40 hover:text-red-400 transition-all"
+                      title="Elimina">
+                      <i data-lucide="trash-2" class="w-3.5 h-3.5"></i>
+                    </button>
+                  </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       GESTIONE DATI (Cache + Upload)
+  ══════════════════════════════════════════════════════ -->
+  <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+    <!-- Cache status -->
+    <div>
+      <div class="section-title">
+        <i data-lucide="database-zap" class="w-3 h-3"></i>
+        Stato Cache Dati
+      </div>
+      <div class="kpi-card space-y-4">
+
+        <div class="grid grid-cols-2 gap-3">
+          <div class="bg-white/3 rounded-xl p-3 border border-white/5">
+            <div class="text-white/30 text-[10px] uppercase tracking-wider mb-1">Comportamento HCP</div>
+            <div class="text-white font-bold text-lg" id="ci-n-beh">
+              {{ '{:,}'.format(cache_info.n_beh).replace(',', '.') if cache_info.n_beh else '—' }}
+            </div>
+            <div class="text-white/30 text-xs">righe</div>
+          </div>
+          <div class="bg-white/3 rounded-xl p-3 border border-white/5">
+            <div class="text-white/30 text-[10px] uppercase tracking-wider mb-1">Performance Channel</div>
+            <div class="text-white font-bold text-lg" id="ci-n-perf">
+              {{ '{:,}'.format(cache_info.n_perf).replace(',', '.') if cache_info.n_perf else '—' }}
+            </div>
+            <div class="text-white/30 text-xs">righe</div>
+          </div>
+        </div>
+
+        <div class="space-y-2 text-xs text-white/45">
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="clock" class="w-3 h-3"></i> Caricato il
+            </span>
+            <span class="text-white/65" id="ci-loaded-at">{{ cache_info.loaded_at or '—' }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="timer" class="w-3 h-3"></i> Scade il
+            </span>
+            <span class="text-white/65" id="ci-expires-at">{{ cache_info.expires_at or '—' }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="hourglass" class="w-3 h-3"></i> Rimanenti
+            </span>
+            <span id="ci-remaining"
+              class="{{ 'text-warning' if cache_info.remaining_m < 60 else 'text-success' }}">
+              {% if cache_info.remaining_m %}
+                {{ cache_info.remaining_m // 60 }}h {{ cache_info.remaining_m % 60 }}m
+              {% else %}—{% endif %}
+            </span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="flex items-center gap-1.5">
+              <i data-lucide="settings" class="w-3 h-3"></i> TTL configurato
+            </span>
+            <span>{{ cache_info.ttl_hours }}h</span>
+          </div>
+        </div>
+
+        <button id="btn-reload"
+          onclick="reloadCache()"
+          class="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl
+                 bg-accent/15 hover:bg-accent/25 border border-accent/20 text-accent
+                 text-sm font-medium transition-all">
+          <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+          Forza ricarica dati
+        </button>
+
+      </div>
+    </div>
+
+    <!-- Upload Excel -->
+    <div>
+      <div class="section-title">
+        <i data-lucide="upload" class="w-3 h-3"></i>
+        Upload File Excel
+      </div>
+      <div class="kpi-card space-y-4">
+
+        <p class="text-white/40 text-xs leading-relaxed">
+          Carica i file Excel aggiornati. Il sistema sovrascriverà il file esistente
+          in <code class="text-accent/70 bg-accent/10 px-1 rounded">data_raw/</code>
+          e invaliderà automaticamente la cache.
+        </p>
+
+        <!-- Upload Comportamento -->
+        <div class="space-y-2">
+          <div class="text-[11px] text-white/50 uppercase tracking-wider font-medium">
+            Comportamento HCP.xlsx
+          </div>
+          <div id="drop-comportamento"
+            class="border-2 border-dashed border-white/10 hover:border-accent/30 rounded-xl p-5
+                   flex flex-col items-center gap-2 text-white/30 text-xs cursor-pointer
+                   transition-all hover:bg-accent/5"
+            onclick="document.getElementById('file-comportamento').click()">
+            <i data-lucide="file-spreadsheet" class="w-7 h-7 opacity-50"></i>
+            <span>Trascina qui o <span class="text-accent/70 underline underline-offset-2">sfoglia</span></span>
+            <span id="lbl-comportamento" class="text-white/25"></span>
+          </div>
+          <input type="file" id="file-comportamento" accept=".xlsx,.xls" class="hidden"
+            onchange="selectFile('comportamento', this)">
+          <button onclick="uploadFile('comportamento')"
+            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+                   bg-white/5 hover:bg-accent/15 border border-white/8 hover:border-accent/25
+                   text-white/50 hover:text-accent text-xs font-medium transition-all"
+            id="btn-up-comportamento" disabled>
+            <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> Carica Comportamento HCP
+          </button>
+        </div>
+
+        <div class="border-t border-white/5"></div>
+
+        <!-- Upload Performance -->
+        <div class="space-y-2">
+          <div class="text-[11px] text-white/50 uppercase tracking-wider font-medium">
+            Performance Channel.xlsx
+          </div>
+          <div id="drop-performance"
+            class="border-2 border-dashed border-white/10 hover:border-accent/30 rounded-xl p-5
+                   flex flex-col items-center gap-2 text-white/30 text-xs cursor-pointer
+                   transition-all hover:bg-accent/5"
+            onclick="document.getElementById('file-performance').click()">
+            <i data-lucide="file-spreadsheet" class="w-7 h-7 opacity-50"></i>
+            <span>Trascina qui o <span class="text-accent/70 underline underline-offset-2">sfoglia</span></span>
+            <span id="lbl-performance" class="text-white/25"></span>
+          </div>
+          <input type="file" id="file-performance" accept=".xlsx,.xls" class="hidden"
+            onchange="selectFile('performance', this)">
+          <button onclick="uploadFile('performance')"
+            class="w-full flex items-center justify-center gap-2 px-3 py-2 rounded-lg
+                   bg-white/5 hover:bg-accent/15 border border-white/8 hover:border-accent/25
+                   text-white/50 hover:text-accent text-xs font-medium transition-all"
+            id="btn-up-performance" disabled>
+            <i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> Carica Performance Channel
+          </button>
+        </div>
+
+        <!-- Messaggio upload -->
+        <div id="upload-msg" class="hidden text-xs rounded-lg px-3 py-2.5 border"></div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ── Upload ──────────────────────────────────────────────
+const selectedFiles = {};
+
+function selectFile(type, input) {
+  if (!input.files.length) return;
+  const f = input.files[0];
+  selectedFiles[type] = f;
+  document.getElementById('lbl-' + type).textContent = f.name;
+  document.getElementById('btn-up-' + type).disabled = false;
+  document.getElementById('drop-' + type).classList.add('border-accent/40', 'bg-accent/5');
+}
+
+async function uploadFile(type) {
+  const f = selectedFiles[type];
+  if (!f) return;
+
+  const btn = document.getElementById('btn-up-' + type);
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-3.5 h-3.5 animate-spin"></i> Caricamento...';
+  lucide.createIcons();
+
+  const fd = new FormData();
+  fd.append('file_type', type);
+  fd.append('file', f);
+
+  try {
+    const res  = await fetch('/admin/upload', { method: 'POST', body: fd }).then(r => r.json());
+    const msgEl = document.getElementById('upload-msg');
+    if (res.ok) {
+      msgEl.className = 'text-xs rounded-lg px-3 py-2.5 border text-success bg-success/10 border-success/20';
+      msgEl.textContent = res.message;
+      updateCacheInfo();
+    } else {
+      msgEl.className = 'text-xs rounded-lg px-3 py-2.5 border text-red-400 bg-red-500/10 border-red-500/20';
+      msgEl.textContent = res.error || 'Errore sconosciuto.';
+    }
+    msgEl.classList.remove('hidden');
+  } catch (e) {
+    console.error(e);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="upload-cloud" class="w-3.5 h-3.5"></i> Carica ' + (type === 'comportamento' ? 'Comportamento HCP' : 'Performance Channel');
+    lucide.createIcons();
+  }
+}
+
+// Drag & drop
+['comportamento', 'performance'].forEach(type => {
+  const zone = document.getElementById('drop-' + type);
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('border-accent/40'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('border-accent/40'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    const fakeInput = { files: [file] };
+    selectFile(type, fakeInput);
+    // Aggiorna anche l'input reale
+    const inp = document.getElementById('file-' + type);
+    const dt  = new DataTransfer();
+    dt.items.add(file);
+    inp.files = dt.files;
+  });
+});
+
+// ── Cache reload ─────────────────────────────────────────
+async function reloadCache() {
+  const btn = document.getElementById('btn-reload');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Ricaricamento...';
+  lucide.createIcons();
+  try {
+    const res = await fetch('/admin/cache/reload', { method: 'POST' }).then(r => r.json());
+    if (res.ok) updateCacheInfo(res.cache);
+  } catch (e) { console.error(e); }
+  finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="refresh-cw" class="w-4 h-4"></i> Forza ricarica dati';
+    lucide.createIcons();
+  }
+}
+
+async function updateCacheInfo(data) {
+  if (!data) {
+    try { data = await fetch('/admin/cache/info').then(r => r.json()); }
+    catch(e) { return; }
+  }
+  if (data.n_beh  !== undefined) document.getElementById('ci-n-beh').textContent  = data.n_beh.toLocaleString('it-IT');
+  if (data.n_perf !== undefined) document.getElementById('ci-n-perf').textContent = data.n_perf.toLocaleString('it-IT');
+  if (data.loaded_at)  document.getElementById('ci-loaded-at').textContent  = data.loaded_at;
+  if (data.expires_at) document.getElementById('ci-expires-at').textContent = data.expires_at;
+  if (data.remaining_m !== undefined) {
+    const h = Math.floor(data.remaining_m / 60), m = data.remaining_m % 60;
+    document.getElementById('ci-remaining').textContent = `${h}h ${m}m`;
+    document.getElementById('ci-remaining').className   = data.remaining_m < 60 ? 'text-warning' : 'text-success';
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+</script>
+{% endblock %}

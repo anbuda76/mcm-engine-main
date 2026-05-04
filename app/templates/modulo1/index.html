@@ -1,0 +1,2056 @@
+{% extends "base.html" %}
+{% block title %}Comportamento{% endblock %}
+{% block page_title %}Modulo 1 — Comportamento HCP{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <!-- ── Header + Filtri ── -->
+  <div class="kpi-card space-y-4">
+
+    <!-- Titolo + descrizione -->
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <i data-lucide="users-round" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-semibold text-sm">Comportamento HCP per Canale</div>
+        <div class="text-white/50 text-xs mt-0.5 leading-relaxed">
+          Analizza come i medici interagiscono con i <span class="text-white/70 font-medium">{{ n_canali }} canali</span> di comunicazione pharma.
+          Segmenta per <span class="text-white/70 font-medium">specializzazione</span>, <span class="text-white/70 font-medium">area terapeutica</span> e <span class="text-white/70 font-medium">patologia</span>
+          per misurare Penetrazione, Ricordo, Ingaggio, Utilità, Propensione e NPS sul tuo HCP target.
+        </div>
+      </div>
+      <span id="hcp-count" class="badge badge-accent hidden flex-shrink-0"></span>
+    </div>
+
+    <!-- Riga filtri -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- Specializzazione HCP -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Specializzazione HCP</label>
+        <select id="sel-spec" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          {% for s in specializzazioni %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Area Terapeutica (Q7a) -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider flex items-center gap-1.5">
+          Area Terapeutica
+          <span id="area-badge" class="hidden badge badge-accent text-[9px]">attiva</span>
+        </label>
+        <select id="sel-area" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          {% for a in aree_terapeutiche %}
+            <option value="{{ a }}">{{ a }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Patologia (Q7b — dipende da area selezionata) -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider flex items-center gap-1.5">
+          Patologia
+          <span id="pat-badge" class="hidden badge badge-accent text-[9px]">attiva</span>
+          <span id="pat-loading" class="hidden">
+            <i data-lucide="loader" class="w-3 h-3 animate-spin text-white/30"></i>
+          </span>
+        </label>
+        <select id="sel-patologia" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          <option disabled value="">— Seleziona prima un'area —</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Pulsante Avvia Analisi -->
+    <div class="flex items-center gap-3 pt-1">
+      <button id="btn-load"
+        class="flex items-center gap-2.5 px-6 py-2.5 bg-accent hover:bg-accent/80 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap">
+        <i data-lucide="play-circle" class="w-4 h-4"></i>
+        Avvia Analisi
+      </button>
+      <div id="load-hint" class="text-xs text-white/30 italic">
+        Imposta i filtri e clicca <strong class="text-white/50">Avvia Analisi</strong> per visualizzare i KPI
+      </div>
+      <div id="load-status" class="hidden text-xs text-accent flex items-center gap-1.5">
+        <i id="load-status-icon" data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+        <span id="load-status-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Insufficient data state ── -->
+  <div id="insufficient-state" class="kpi-card hidden">
+    <div class="flex flex-col items-center justify-center py-10 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center mb-4">
+        <i data-lucide="clock" class="w-7 h-7 text-warning/60"></i>
+      </div>
+      <div class="text-white/80 text-sm font-semibold mb-2">Dati in aggiornamento incrementale</div>
+      <div class="text-white/40 text-xs max-w-sm leading-relaxed mb-5">
+        Il campione per questa specializzazione è in fase di raccolta. I risultati
+        statisticamente significativi saranno disponibili al prossimo aggiornamento del panel.
+      </div>
+      <div id="insuf-badge" class="badge badge-warning px-3 py-1.5 text-xs mb-3"></div>
+      <div class="text-white/25 text-[11px] mt-1">
+        Soglia minima per l'analisi: <span class="text-white/40 font-medium">20 HCP</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Empty state (pre-analisi) ── -->
+  <div id="empty-state" class="kpi-card flex flex-col items-center justify-center py-14 text-center">
+    <div class="w-14 h-14 rounded-2xl bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+      <i data-lucide="bar-chart-2" class="w-7 h-7 text-accent/50"></i>
+    </div>
+    <div class="text-white/50 text-sm font-medium mb-1">Nessuna analisi avviata</div>
+    <div class="text-white/25 text-xs mb-6">Imposta i filtri e clicca <strong class="text-white/40">Avvia Analisi</strong></div>
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 max-w-2xl">
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="signal" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">Penetrazione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="brain" class="w-4 h-4 text-blue-400/50"></i>
+        <span class="text-[10px] text-white/25">Ricordo</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="zap" class="w-4 h-4 text-yellow-400/50"></i>
+        <span class="text-[10px] text-white/25">Ingaggio</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="star" class="w-4 h-4 text-warning/50"></i>
+        <span class="text-[10px] text-white/25">Utilità</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="thumbs-up" class="w-4 h-4 text-success/50"></i>
+        <span class="text-[10px] text-white/25">Propensione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="gauge" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">NPS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KPI summary bar (hidden until first analysis) ── -->
+  <div id="kpi-summary" class="grid grid-cols-2 md:grid-cols-4 gap-3 hidden">
+    <div class="kpi-card">
+      <div class="kpi-label">Media Penetrazione</div>
+      <div class="kpi-value" id="sum-pen">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Media Ingaggio</div>
+      <div class="kpi-value" id="sum-ing">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Media Propensione</div>
+      <div class="kpi-value" id="sum-prop">—</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-label">Top Canale</div>
+      <div class="kpi-value text-base" id="sum-top">—</div>
+    </div>
+  </div>
+
+  <!-- ── Tab bar (hidden until first analysis) ── -->
+  <div class="tab-bar hidden" id="tab-container">
+    <button class="tab-btn" data-tab="kpi">
+      <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> KPI Canali
+    </button>
+    <button class="tab-btn" data-tab="mappe">
+      <i data-lucide="scatter-chart" class="w-3.5 h-3.5"></i> Mappe
+    </button>
+    <button class="tab-btn" data-tab="funnel">
+      <i data-lucide="git-branch" class="w-3.5 h-3.5"></i> Funnel HCP
+    </button>
+    <button class="tab-btn" data-tab="ocv">
+      <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i> OCV
+    </button>
+    <button class="tab-btn" data-tab="download">
+      <i data-lucide="download" class="w-3.5 h-3.5"></i> Download
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 1 — KPI CANALI
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-kpi" class="tab-panel hidden space-y-4">
+
+    <!-- Riga 1: Penetrazione + Utilità -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="signal" class="w-3.5 h-3.5 text-accent"></i>
+          Penetrazione Canali (%)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">% di HCP che hanno ricevuto almeno un contatto tramite il canale nel periodo di riferimento. Misura il reach effettivo del canale sul target.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q11a</span>
+        </div>
+        <div id="chart-pen" style="height:420px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="star" class="w-3.5 h-3.5 text-warning"></i>
+          Utilità Media (1–7)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Score medio di utilità percepita del canale, su scala 1–7. Misura la qualità e il valore attribuito dall'HCP: 1 = per niente utile, 7 = indispensabile.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q6</span>
+        </div>
+        <div id="chart-util" style="height:420px"></div>
+      </div>
+    </div>
+
+    <!-- Toggle modalità lettura KPI -->
+    <div class="flex flex-col sm:flex-row sm:items-center gap-3 px-1 py-1">
+      <!-- Pill toggle -->
+      <div class="flex items-center gap-1 bg-white/5 border border-white/8 rounded-lg p-1 flex-shrink-0">
+        <button id="toggle-efficacia"
+          onclick="setKpiMode('efficacia')"
+          class="kpi-mode-btn active flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all">
+          <i data-lucide="target" class="w-3 h-3"></i>
+          Efficacia Canale
+        </button>
+        <button id="toggle-impatto"
+          onclick="setKpiMode('impatto')"
+          class="kpi-mode-btn flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[11px] font-medium transition-all">
+          <i data-lucide="users" class="w-3 h-3"></i>
+          Impatto su Mercato
+        </button>
+      </div>
+      <!-- Descrizione contestuale -->
+      <div id="kpi-mode-hint" class="text-[10px] text-white/35 italic leading-relaxed">
+        Base: <strong class="text-white/50">HCP esposti al canale</strong> — misura la qualità del messaggio tra chi ha già ricevuto il contatto.
+        Hover sui grafici per la lettura <em>"su 100 medici"</em>.
+      </div>
+    </div>
+
+    <!-- Riga 2: Ricordo + Ingaggio -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="brain" class="w-3.5 h-3.5 text-blue-300"></i>
+          <span id="title-ric">Ricordo Comunicazione (%)</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip" id="tip-ric">% di HCP esposti al canale che ricordano di aver ricevuto comunicazioni aziendali. Base: HCP che dichiarano di aver usato il canale. Hover per la lettura "su 100 medici".</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q10</span>
+        </div>
+        <div id="chart-ric" style="height:420px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i>
+          <span id="title-ing">Ingaggio per Canale (%)</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip" id="tip-ing">Distribuzione dell'engagement tra gli HCP esposti: quota che ha condiviso (alto), approfondito (medio) o non interagito (nulla). Base: HCP esposti al canale. Hover per la lettura "su 100 medici".</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q13</span>
+        </div>
+        <div id="chart-ing" style="height:420px"></div>
+      </div>
+    </div>
+
+    <!-- Riga 3: Propensione + NPS -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="thumbs-up" class="w-3.5 h-3.5 text-success"></i>
+          <span id="title-prop">Propensione al Consiglio</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip" id="tip-prop">Probabilità media (scala 0–10) con cui l'HCP consiglierebbe il prodotto dopo interazione tramite il canale. Score ≥7 indica alta propensione. Hover: lettura "su 100 medici".</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q16</span>
+        </div>
+        <div id="chart-prop" style="height:420px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="gauge" class="w-3.5 h-3.5 text-accent"></i>
+          NPS per Canale
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Net Promoter Score per canale: % Promotori (voto 9–10) meno % Detrattori (voto 0–6). Range −100/+100. Valori positivi indicano canali percepiti positivamente dall'HCP.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q16 NPS</span>
+        </div>
+        <div id="chart-nps" style="height:420px"></div>
+      </div>
+    </div>
+
+    <!-- Riga 4: Utilità Fasce (full width) -->
+    <div class="chart-container">
+      <div class="chart-title">
+        <i data-lucide="layers" class="w-3.5 h-3.5 text-purple-400"></i>
+        Attitudine al Canale — Segmentazione HCP per Profilo di Contatto
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Distribuzione % degli HCP per fascia di utilità percepita del canale (Q6, scala 1–7): Indispensabile (7), Molto utile (6), Utile (5), Poco utile (3–4), Non utile (1–2). Identifica per ogni canale la quota di HCP ad alta vs bassa propensione — base per una segmentazione del target per modalità di contatto preferita.</span>
+        </span>
+        <span class="ml-auto badge badge-muted">Q6 fasce</span>
+      </div>
+      <div id="chart-fasce" style="height:420px"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 2 — MAPPE SCATTER
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-mappe" class="tab-panel hidden space-y-4">
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-accent"></i>
+          Mappa: Utilità vs Penetrazione
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Posiziona i canali su due assi: reach (penetrazione) e qualità percepita (utilità). I quadranti identificano canali star, opportunità da sfruttare, canali con alto reach da valorizzare e canali da rivalutare.</span>
+          </span>
+        </div>
+        <div id="chart-mappa1" style="height:460px"></div>
+      </div>
+
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="crosshair" class="w-3.5 h-3.5 text-warning"></i>
+          Mappa: Ingaggio vs Utilità
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Confronta qualità percepita (utilità) e livello di engagement generato (ingaggio). Canali in alto a destra producono sia alto apprezzamento che interazione attiva: sono i canali prioritari sul mix.</span>
+          </span>
+        </div>
+        <div id="chart-mappa2" style="height:460px"></div>
+      </div>
+    </div>
+
+    <!-- Legenda quadranti -->
+    <div class="kpi-card">
+      <div class="chart-title mb-3">
+        <i data-lucide="info" class="w-3.5 h-3.5"></i>
+        Legenda Quadranti
+      </div>
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+        <div class="flex items-start gap-2">
+          <div class="w-2.5 h-2.5 rounded-sm bg-success/60 mt-0.5 flex-shrink-0"></div>
+          <div><div class="text-white/70 font-medium">Alto-Alto</div><div class="text-white/35">Canali star: alta penetrazione e alta utilità</div></div>
+        </div>
+        <div class="flex items-start gap-2">
+          <div class="w-2.5 h-2.5 rounded-sm bg-warning/60 mt-0.5 flex-shrink-0"></div>
+          <div><div class="text-white/70 font-medium">Basso-Alto</div><div class="text-white/35">Opportunità: alta utilità, bassa penetrazione</div></div>
+        </div>
+        <div class="flex items-start gap-2">
+          <div class="w-2.5 h-2.5 rounded-sm bg-blue-400/60 mt-0.5 flex-shrink-0"></div>
+          <div><div class="text-white/70 font-medium">Alto-Basso</div><div class="text-white/35">Reach alto, valore da migliorare</div></div>
+        </div>
+        <div class="flex items-start gap-2">
+          <div class="w-2.5 h-2.5 rounded-sm bg-white/20 mt-0.5 flex-shrink-0"></div>
+          <div><div class="text-white/70 font-medium">Basso-Basso</div><div class="text-white/35">Da valutare o abbandonare</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 3 — FUNNEL HCP
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-funnel" class="tab-panel hidden space-y-4">
+
+    <!-- Intro card -->
+    <div class="kpi-card">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="git-branch" class="w-4 h-4 text-accent"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-white/80 font-semibold text-sm">Customer Journey HCP per Canale</div>
+          <div class="text-white/40 text-xs mt-0.5 leading-relaxed">
+            Visualizza il percorso del medico stadio per stadio: dalla <span class="text-white/60">reach iniziale</span>
+            al <span class="text-white/60">ricordo</span>, all'<span class="text-white/60">ingaggio attivo</span>,
+            fino all'<span class="text-white/60">alta propensione prescrittiva</span> (score ≥7).
+            I numeri rappresentano l'HCP effettivo ad ogni conversione.
+          </div>
+        </div>
+        <div class="flex items-center gap-3 flex-shrink-0 text-[10px] text-white/30">
+          <div class="flex items-center gap-1"><div class="w-2.5 h-2 rounded bg-success/80"></div> Alta Prop. ≥7</div>
+          <div class="flex items-center gap-1"><div class="w-2.5 h-2 rounded bg-warning/80"></div> Ingaggiati</div>
+          <div class="flex items-center gap-1"><div class="w-2.5 h-2 rounded bg-blue-400/80"></div> Ricordano</div>
+          <div class="flex items-center gap-1"><div class="w-2.5 h-2 rounded bg-white/15"></div> Raggiunti</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sezione A: Funnel Matrix (stacked horizontal bars) -->
+    <div class="chart-container">
+      <div class="chart-title">
+        <i data-lucide="layers" class="w-3.5 h-3.5 text-accent"></i>
+        <span id="title-funnel">Funnel Matrix — HCP per Stadio e Canale</span>
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip" id="tip-funnel">Ogni barra mostra gli HCP al lordo (Raggiunti) suddivisi per stadio: Ricordano · Ingaggiati · Alta Propensione. Hover: tassi di conversione tra stadi. Ordinati per reach totale.</span>
+        </span>
+      </div>
+      <div id="chart-funnel-matrix" style="height:540px"></div>
+    </div>
+
+    <!-- Sezione B: Sankey Flow -->
+    <div class="chart-container">
+      <div class="chart-title">
+        <i data-lucide="git-merge" class="w-3.5 h-3.5 text-blue-300"></i>
+        Flusso HCP — Top 8 Canali × Ricordo × Ingaggio × Propensione
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Diagramma Sankey: i flussi mostrano quanti HCP, per ognuno degli 8 canali con maggior reach, attraversano gli stadi del funnel. La larghezza del flusso è proporzionale al numero di medici.</span>
+        </span>
+      </div>
+      <div id="chart-funnel-sankey" style="height:500px"></div>
+    </div>
+
+    <!-- Sezione C: Best Path OCV -->
+    <div class="kpi-card">
+      <div class="chart-title mb-4">
+        <i data-lucide="route" class="w-3.5 h-3.5 text-warning"></i>
+        Best Path — Mix Canali Ottimali per Frequenza HCP
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">I mix di canali più utilizzati dagli HCP nel campione, con il relativo OCV (Omni-Channel Value). Rappresentano i percorsi reali più comuni e il loro impatto sul ricordo omnicanale.</span>
+        </span>
+      </div>
+      <div id="funnel-best-path" class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 4 — OCV
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-ocv" class="tab-panel hidden space-y-4">
+
+    <!-- ── Card introduttiva OCV ── -->
+    <div class="kpi-card p-5 border border-accent/15">
+      <div class="flex items-start gap-4">
+        <!-- Icona -->
+        <div class="w-10 h-10 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+          <i data-lucide="sliders-horizontal" class="w-5 h-5 text-accent"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-center gap-2 mb-1.5">
+            <span class="text-white font-semibold text-sm">OCV — Omnichannel Value</span>
+            <span class="badge badge-accent text-[10px] px-2">Indicatore Strategico</span>
+          </div>
+          <p class="text-white/55 text-xs leading-relaxed mb-3">
+            L'OCV misura se i canali di comunicazione <strong class="text-white/75">lavorano insieme</strong>
+            o si <strong class="text-white/75">cannibalizzano</strong>.
+            Quando un medico riceve informazioni da più fonti contemporaneamente, le ricorda di più?
+            E quanto di più rispetto a un singolo canale?
+          </p>
+          <!-- Formula visiva -->
+          <div class="flex items-center gap-2 flex-wrap mb-3">
+            <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+              <i data-lucide="layers" class="w-3 h-3 text-accent flex-shrink-0"></i>
+              <span class="text-[11px] text-white/60">Recall con mix di canali</span>
+            </div>
+            <span class="text-white/25 text-xs font-bold">−</span>
+            <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+              <i data-lucide="minus-circle" class="w-3 h-3 text-white/40 flex-shrink-0"></i>
+              <span class="text-[11px] text-white/60">Recall medio singolo canale</span>
+            </div>
+            <span class="text-white/25 text-xs font-bold">÷</span>
+            <div class="flex items-center gap-1.5 bg-white/5 border border-white/10 rounded-lg px-3 py-1.5">
+              <i data-lucide="minus-circle" class="w-3 h-3 text-white/40 flex-shrink-0"></i>
+              <span class="text-[11px] text-white/60">Recall medio singolo canale</span>
+            </div>
+            <span class="text-white/25 text-xs font-bold">× 100</span>
+            <span class="text-accent font-bold text-sm ml-1">= OCV %</span>
+          </div>
+          <!-- Esempi di lettura -->
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div class="flex items-start gap-2 bg-success/8 border border-success/15 rounded-lg p-2.5">
+              <i data-lucide="trending-up" class="w-3.5 h-3.5 text-success flex-shrink-0 mt-0.5"></i>
+              <div>
+                <div class="text-success text-[11px] font-semibold">OCV +67%</div>
+                <div class="text-white/45 text-[10px] leading-relaxed mt-0.5">I medici esposti a questo mix ricordano il messaggio il <strong class="text-white/60">67% in più</strong> rispetto a chi riceve un solo canale</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 bg-orange-500/8 border border-orange-500/15 rounded-lg p-2.5">
+              <i data-lucide="minus" class="w-3.5 h-3.5 text-orange-400 flex-shrink-0 mt-0.5"></i>
+              <div>
+                <div class="text-orange-400 text-[11px] font-semibold">OCV −12%</div>
+                <div class="text-white/45 text-[10px] leading-relaxed mt-0.5">I canali si <strong class="text-white/60">disturbano</strong> — il medico è sovraesposto o riceve messaggi incoerenti</div>
+              </div>
+            </div>
+            <div class="flex items-start gap-2 bg-accent/8 border border-accent/15 rounded-lg p-2.5">
+              <i data-lucide="target" class="w-3.5 h-3.5 text-accent flex-shrink-0 mt-0.5"></i>
+              <div>
+                <div class="text-accent text-[11px] font-semibold">Impatto Reale</div>
+                <div class="text-white/45 text-[10px] leading-relaxed mt-0.5">Quanti medici <strong class="text-white/60">su 100 totali</strong> ricordano il messaggio grazie a questo mix (Penetrazione × Recall)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- KPI OCV cards -->
+    <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+      <div class="kpi-card">
+        <div class="kpi-label flex items-center gap-1.5">
+          Ricordo — 1 canale
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">% di HCP che ricordano il messaggio quando sono raggiunti da <strong>un solo canale</strong>. È la baseline: il punto di partenza senza effetto omnicanale.</span>
+          </span>
+        </div>
+        <div class="kpi-value" id="ocv-recall1">—</div>
+        <div class="text-white/30 text-xs mt-1">Baseline mono-canale</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label flex items-center gap-1.5">
+          Ricordo — ≥3 canali
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">% di HCP che ricordano il messaggio quando sono raggiunti da <strong>3 o più canali</strong>. Il confronto con il mono-canale quantifica il beneficio dell'approccio omnicanale.</span>
+          </span>
+        </div>
+        <div class="kpi-value" id="ocv-recall3">—</div>
+        <div class="text-white/30 text-xs mt-1">Approccio omnicanale</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label flex items-center gap-1.5">
+          Δ OCV Omnicanale
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Differenza percentuale di ricordo tra approccio omnicanale (≥3 canali) e mono-canale. Risponde alla domanda: <strong>"Vale la pena usare più canali?"</strong> — e di quanto.</span>
+          </span>
+        </div>
+        <div class="kpi-value text-success" id="ocv-delta-val">—</div>
+        <div class="text-white/30 text-xs mt-1">Vantaggio multi-canale</div>
+      </div>
+      <div class="kpi-card">
+        <div class="kpi-label flex items-center gap-1.5">
+          <span id="ocv-best-label">Best Mix — Business Action</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">La combinazione di canali con il migliore indicatore nella vista selezionata. In <strong>Valore OCV</strong>: mix con sinergia massima. In <strong>Impatto Reale</strong>: mix che raggiunge più medici con il messaggio ricordato.</span>
+          </span>
+        </div>
+        <div class="text-white font-semibold text-sm mt-1 leading-snug" id="ocv-best-action">—</div>
+        <div class="text-accent text-xs mt-1 font-medium" id="ocv-best-val"></div>
+      </div>
+    </div>
+
+    <!-- Best Combo card (full width) -->
+    <div class="kpi-card">
+      <div class="flex items-start gap-3">
+        <div class="w-9 h-9 rounded-xl bg-warning/15 border border-warning/20 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="trophy" class="w-4 h-4 text-warning"></i>
+        </div>
+        <div class="flex-1 min-w-0">
+          <div class="text-[11px] text-white/35 uppercase tracking-wider mb-1">Best Combinazione per OCV</div>
+          <div class="text-white font-semibold text-sm leading-relaxed" id="ocv-best-mix">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Legenda Classi OCV — sempre visibile, guida alla lettura -->
+    <div class="kpi-card p-4">
+      <div class="flex items-center gap-2 mb-3">
+        <i data-lucide="book-open" class="w-3.5 h-3.5 text-accent flex-shrink-0"></i>
+        <span class="text-[11px] font-semibold text-white/60 uppercase tracking-wider">Guida alla Lettura — Classi OCV &amp; Business Action</span>
+        <span class="chart-info ml-1">
+          <i data-lucide="info"></i>
+          <span class="tip">L'OCV (Omnichannel Value) misura l'incremento % del ricordo del messaggio ottenuto usando più canali insieme rispetto alla media del singolo canale. OCV positivo = sinergia tra canali; OCV negativo = saturazione o rumore.</span>
+        </span>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-2">
+        <!-- High Positive OCV -->
+        <div class="flex items-start gap-2.5 rounded-lg bg-success/8 border border-success/20 p-3">
+          <div class="w-2.5 h-2.5 rounded-full bg-success mt-0.5 flex-shrink-0"></div>
+          <div>
+            <div class="text-[10px] text-white/40 font-medium uppercase tracking-wide mb-0.5">OCV ≥ 20%</div>
+            <div class="text-success font-semibold text-xs leading-snug">High Positive OCV</div>
+            <div class="text-[10px] text-white/55 mt-0.5">Forte sinergia tra canali</div>
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-success/15 text-success text-[10px] font-semibold px-1.5 py-0.5 rounded">
+              <i data-lucide="trending-up" class="w-2.5 h-2.5"></i> Scale / Invest
+            </div>
+          </div>
+        </div>
+        <!-- Low Positive OCV -->
+        <div class="flex items-start gap-2.5 rounded-lg bg-accent/8 border border-accent/20 p-3">
+          <div class="w-2.5 h-2.5 rounded-full bg-accent mt-0.5 flex-shrink-0"></div>
+          <div>
+            <div class="text-[10px] text-white/40 font-medium uppercase tracking-wide mb-0.5">0% ≤ OCV &lt; 20%</div>
+            <div class="text-accent font-semibold text-xs leading-snug">Low Positive OCV</div>
+            <div class="text-[10px] text-white/55 mt-0.5">Sinergia debole, da ottimizzare</div>
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-accent/15 text-accent text-[10px] font-semibold px-1.5 py-0.5 rounded">
+              <i data-lucide="settings-2" class="w-2.5 h-2.5"></i> Test / Optimize
+            </div>
+          </div>
+        </div>
+        <!-- Low Negative OCV -->
+        <div class="flex items-start gap-2.5 rounded-lg bg-orange-500/8 border border-orange-500/20 p-3">
+          <div class="w-2.5 h-2.5 rounded-full bg-orange-400 mt-0.5 flex-shrink-0"></div>
+          <div>
+            <div class="text-[10px] text-white/40 font-medium uppercase tracking-wide mb-0.5">-20% ≤ OCV &lt; 0%</div>
+            <div class="text-orange-400 font-semibold text-xs leading-snug">Low Negative OCV</div>
+            <div class="text-[10px] text-white/55 mt-0.5">Leggera interferenza tra canali</div>
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-orange-500/15 text-orange-400 text-[10px] font-semibold px-1.5 py-0.5 rounded">
+              <i data-lucide="eye" class="w-2.5 h-2.5"></i> Monitor
+            </div>
+          </div>
+        </div>
+        <!-- High Negative OCV -->
+        <div class="flex items-start gap-2.5 rounded-lg bg-red-500/8 border border-red-500/20 p-3">
+          <div class="w-2.5 h-2.5 rounded-full bg-red-400 mt-0.5 flex-shrink-0"></div>
+          <div>
+            <div class="text-[10px] text-white/40 font-medium uppercase tracking-wide mb-0.5">OCV &lt; -20%</div>
+            <div class="text-red-400 font-semibold text-xs leading-snug">High Negative OCV</div>
+            <div class="text-[10px] text-white/55 mt-0.5">Saturazione — mix controproducente</div>
+            <div class="mt-1.5 inline-flex items-center gap-1 bg-red-500/15 text-red-400 text-[10px] font-semibold px-1.5 py-0.5 rounded">
+              <i data-lucide="x-circle" class="w-2.5 h-2.5"></i> Avoid / Deprioritize
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Toggle OCV / Impatto Reale -->
+    <div class="flex items-center gap-3 px-1">
+      <span class="text-white/35 text-xs font-medium uppercase tracking-wider">Vista analisi:</span>
+      <div class="flex rounded-lg border border-white/10 overflow-hidden text-xs font-medium">
+        <button id="ocv-mode-btn-ocv" class="kpi-mode-btn active px-3.5 py-1.5 flex items-center gap-1.5 transition-all"
+                onclick="setOcvMode('ocv')">
+          <i data-lucide="trending-up" class="w-3 h-3"></i> Valore OCV
+        </button>
+        <button id="ocv-mode-btn-impatto" class="kpi-mode-btn px-3.5 py-1.5 flex items-center gap-1.5 transition-all"
+                onclick="setOcvMode('impatto')">
+          <i data-lucide="target" class="w-3 h-3"></i> Impatto Reale
+        </button>
+      </div>
+      <span class="chart-info">
+        <i data-lucide="info"></i>
+        <span class="tip"><strong>Valore OCV:</strong> lift relativo del ricordo per HCP esposti al mix vs singolo canale. Misura la sinergia. <br><strong>Impatto Reale:</strong> % di HCP totali che ricordano il messaggio grazie a questo mix (Penetrazione mix × Recall mix / 100). Risponde a: "Su 100 medici, quanti ricordano?"</span>
+      </span>
+    </div>
+
+    <!-- Top 10 per OCV + Top 10 per Frequenza -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i id="ocv-chart1-icon" data-lucide="trophy" class="w-3.5 h-3.5 text-warning"></i>
+          <span id="ocv-chart1-title">Top 10 per Valore OCV (%)</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span id="ocv-chart1-tip" class="tip">Le 10 combinazioni con il più alto Omni-Channel Value: incremento % del ricordo ottenuto col mix vs la media dei singoli canali. Valori positivi = effetto sinergico.</span>
+          </span>
+        </div>
+        <div id="chart-ocv-mix" style="height:400px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="users" class="w-3.5 h-3.5 text-blue-300"></i>
+          Top 10 per Frequenza (N Medici)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Le 10 combinazioni di canali con il maggior numero di HCP esposti. Indica i mix più diffusi nella pratica reale del target analizzato.</span>
+          </span>
+        </div>
+        <div id="chart-ocv-freq" style="height:400px"></div>
+      </div>
+    </div>
+
+    <!-- Tabella Top 10 per Frequenza / Impatto -->
+    <div class="chart-container overflow-x-auto">
+      <div class="chart-title mb-4">
+        <i data-lucide="table-2" class="w-3.5 h-3.5 text-blue-300"></i>
+        <span id="ocv-table-title">Top 10 Mix — Ordinati per Frequenza (N Medici)</span>
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span id="ocv-table-tip" class="tip">Le 10 combinazioni di canali più frequenti nel campione: i mix più usati nella pratica reale, con relativo OCV e raccomandazione strategica.</span>
+        </span>
+      </div>
+      <table class="dark-table w-full" id="table-ocv">
+        <thead>
+          <tr>
+            <th class="text-left w-1/2">Channel Mix</th>
+            <th class="text-center">N Canali</th>
+            <th class="text-center">N Medici</th>
+            <th class="text-center">Recall Mix</th>
+            <th class="text-center" id="ocv-col-main">OCV (%)</th>
+            <th class="text-center" id="ocv-col-recall-ass" style="display:none">Recall Ass.</th>
+            <th class="text-center">Classe OCV</th>
+            <th class="text-left">Business Action</th>
+          </tr>
+        </thead>
+        <tbody id="tbody-ocv"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 4 — DOWNLOAD
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-download" class="tab-panel hidden">
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+      <!-- Card Excel -->
+      <div class="kpi-card">
+        <div class="chart-title mb-4">
+          <i data-lucide="file-spreadsheet" class="w-4 h-4 text-accent"></i>
+          Export Excel — Tutti i KPI
+        </div>
+        <div class="space-y-2 text-sm text-white/50 mb-5">
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Sheet: Penetrazione, Utilita, Utilita Fasce</div>
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Sheet: Ricordo, Ingaggio, Propensione, NPS</div>
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Sheet: OCV Mix Engine</div>
+          <div class="flex items-center gap-2 text-white/30"><i data-lucide="info" class="w-3.5 h-3.5"></i> Canali normalizzati via mappa_canali_labels</div>
+        </div>
+        <button id="btn-export"
+          class="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent/80 text-white font-medium rounded-lg transition-colors text-sm">
+          <i data-lucide="download" class="w-4 h-4"></i>
+          Scarica Excel
+        </button>
+      </div>
+
+      <!-- Card PDF -->
+      <div class="kpi-card">
+        <div class="chart-title mb-4">
+          <i data-lucide="file-text" class="w-4 h-4 text-orange-400"></i>
+          Report PDF — Analisi Completa
+        </div>
+        <div class="space-y-2 text-sm text-white/50 mb-5">
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Pag. 1: Executive Summary + KPI principali</div>
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Pag. 2: Grafici Penetrazione · Ricordo · Ingaggio</div>
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Pag. 3: Mappa Canali + Funnel HCP</div>
+          <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Pag. 4: OCV — Mix ottimale + note metodologiche</div>
+          <div class="flex items-center gap-2 text-white/30"><i data-lucide="info" class="w-3.5 h-3.5"></i> Tema dark · Commenti strategici · Fonte BHAVE</div>
+        </div>
+        <button id="btn-export-pdf"
+          class="flex items-center gap-2 px-5 py-2.5 bg-orange-500 hover:bg-orange-400 text-white font-medium rounded-lg transition-colors text-sm">
+          <i data-lucide="file-text" class="w-4 h-4"></i>
+          Scarica Report PDF
+        </button>
+        <p id="pdf-status" class="text-xs text-white/30 mt-2"></p>
+      </div>
+
+    </div>
+  </div>
+
+</div><!-- /space-y-4 -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ═══════════════════════════════════════════════════════
+// MODULO 1 — JavaScript
+// ═══════════════════════════════════════════════════════
+
+// ── Stato corrente ───────────────────────────────────
+let currentTargets  = [];
+let currentAree     = [];
+let currentPatologie = [];
+let kpiData         = null;
+let mappaData       = null;
+let ocvData         = null;
+let funnelRendered  = false; // Lazy: render solo al primo click sul tab
+let kpiMode         = 'efficacia'; // 'efficacia' | 'impatto'
+let ocvMode         = 'ocv';       // 'ocv' | 'impatto'
+
+// ── Colori dark per Plotly ───────────────────────────
+const C = {
+  accent:   '#00A896',
+  secondary:'#028090',
+  warning:  '#F77F00',
+  success:  '#02C39A',
+  primary:  '#1E2761',
+  blue:     '#60a5fa',
+  purple:   '#a78bfa',
+  pink:     '#f472b6',
+  bg:       'rgba(0,0,0,0)',
+  grid:     'rgba(255,255,255,0.05)',
+  text:     'rgba(255,255,255,0.5)',
+};
+
+// Palette canali coerente con mappa_canali_labels (20 canali)
+const PALETTE = [
+  '#00A896','#028090','#02C39A','#1E2761','#F77F00',
+  '#60a5fa','#a78bfa','#f472b6','#fb923c','#34d399',
+  '#f9a8d4','#fcd34d','#6ee7b7','#93c5fd','#c4b5fd',
+  '#fda4af','#86efac','#67e8f9','#fdba74','#d8b4fe'
+];
+
+// ── Layout base Plotly dark ──────────────────────────
+function baseLayout(extra = {}) {
+  return {
+    paper_bgcolor: C.bg,
+    plot_bgcolor:  C.bg,
+    font:  { family: 'Inter, sans-serif', size: 11, color: C.text },
+    xaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    yaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    margin:  { t: 20, r: 20, b: 50, l: 160 },
+    hoverlabel: {
+      bgcolor:     '#0d1117',
+      bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+    showlegend: false,
+    ...extra
+  };
+}
+
+// ── Render Plotly helper ─────────────────────────────
+function plot(divId, traces, layout) {
+  Plotly.newPlot(divId, traces, layout, { responsive: true, displayModeBar: false });
+}
+
+// ──────────────────────────────────────────────────────
+// GRAFICI KPI
+// ──────────────────────────────────────────────────────
+
+function renderPenetrazione(data) {
+  // Ordine ascendente → il valore più alto appare in cima nel grafico orizzontale Plotly
+  const rows = [...data].sort((a,b) => a['Penetrazione (%)'] - b['Penetrazione (%)']);
+  const canali = rows.map(r => r['Canale_std'] || r['Canale']);
+  const vals   = rows.map(r => r['Penetrazione (%)']);
+  plot('chart-pen', [{
+    type: 'bar', orientation: 'h',
+    x: vals, y: canali,
+    marker: { color: vals.map((v,i) => PALETTE[i % PALETTE.length]), opacity: 0.85 },
+    text: vals.map(v => v != null ? v.toFixed(1) + '%' : ''),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Penetrazione: %{x:.1f}%<extra></extra>',
+  }], baseLayout({ margin: { t: 20, r: 80, b: 30, l: 180 } }));
+}
+
+function renderUtilita(data) {
+  const rows   = [...data].sort((a,b) => a['Utilità media (1-7)'] - b['Utilità media (1-7)']);
+  const canali = rows.map(r => r['Canale_std'] || r['Canale']);
+  const vals   = rows.map(r => r['Utilità media (1-7)']);
+  plot('chart-util', [{
+    type: 'bar', orientation: 'h',
+    x: vals, y: canali,
+    marker: { color: C.warning, opacity: 0.8 },
+    text: vals.map(v => v != null ? v.toFixed(2) : ''),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Utilità: %{x:.2f} / 7<extra></extra>',
+  }], baseLayout({ xaxis: { range: [0, 7.5] }, margin: { t: 20, r: 80, b: 30, l: 180 } }));
+}
+
+// ── Toggle modalità KPI: Efficacia Canale / Impatto su Mercato ───────────
+
+/**
+ * Costruisce la lookup map canale → Penetrazione(%)
+ * usando i dati già caricati in kpiData.
+ */
+function _buildPenMap() {
+  const m = {};
+  if (kpiData && kpiData.penetrazione) {
+    kpiData.penetrazione.forEach(r => {
+      m[r['Canale_std'] || r['Canale']] = r['Penetrazione (%)'] || 0;
+    });
+  }
+  return m;
+}
+
+const _KPI_MODE_CONFIG = {
+  efficacia: {
+    hint: 'Base: <strong class="text-white/55">HCP esposti al canale</strong> — misura la qualità del messaggio per chi ha già ricevuto il contatto. Hover sui grafici per la lettura <em>"su 100 medici"</em>.',
+    titleRic:    'Ricordo Comunicazione (%)',
+    titleIng:    'Ingaggio per Canale (%)',
+    titleProp:   'Propensione al Consiglio',
+    titleFunnel: 'Funnel Matrix — HCP per Stadio e Canale',
+    tipRic:    '% di HCP <b>esposti al canale</b> che ricordano le comunicazioni aziendali. Hover: lettura "su 100 medici".',
+    tipIng:    'Engagement degli HCP <b>esposti al canale</b>: condivisione + approfondimento vs nulla. Hover: lettura "su 100 medici".',
+    tipProp:   'Probabilità media (0–10) con cui l\'HCP consiglierebbe il prodotto, tra gli esposti. Hover: lettura "su 100 medici".',
+    tipFunnel: 'N HCP assoluti per stadio. Hover: tassi di conversione tra stadi (% di esposti che ricordano, % di ricordanti che si ingaggiano, ecc.).',
+  },
+  impatto: {
+    hint: 'Base: <strong class="text-white/55">universo totale HCP</strong> — KPI pesati per la Penetrazione. Confronto diretto tra canali su base omogenea.',
+    titleRic:    'Ricordo su Universo HCP (%) — pesato per Penetrazione',
+    titleIng:    'Ingaggio su Universo HCP (%) — pesato per Penetrazione',
+    titleProp:   'Propensione Pesata (score × reach)',
+    titleFunnel: 'Funnel Matrix — % su Universo HCP (base omogenea)',
+    tipRic:    '% su <b>tutti gli HCP</b> = Ricordo(esposti) × Penetrazione / 100. Confronto diretto tra canali con reach diverso.',
+    tipIng:    '% su <b>tutti gli HCP</b> = Ingaggio(esposti) × Penetrazione / 100. Confronto diretto tra canali con reach diverso.',
+    tipProp:   'Score pesato per il reach del canale. Un canale con score 8 ma pen. 20% vale meno di score 6 con pen. 80%.',
+    tipFunnel: '% di <b>tutti gli HCP</b> per stadio di funnel. Ogni segmento mostra quanti medici, su 100 totali, si trovano in quello stadio per quel canale.',
+  },
+};
+
+function setKpiMode(mode) {
+  kpiMode = mode;
+  // Toggle pulsanti
+  document.getElementById('toggle-efficacia').classList.toggle('active', mode === 'efficacia');
+  document.getElementById('toggle-impatto').classList.toggle('active', mode === 'impatto');
+  // Aggiorna hint, titoli, tooltip info
+  const cfg = _KPI_MODE_CONFIG[mode];
+  document.getElementById('kpi-mode-hint').innerHTML     = cfg.hint;
+  document.getElementById('title-ric').textContent       = cfg.titleRic;
+  document.getElementById('title-ing').textContent       = cfg.titleIng;
+  document.getElementById('title-prop').textContent      = cfg.titleProp;
+  document.getElementById('title-funnel').textContent    = cfg.titleFunnel;
+  document.getElementById('tip-ric').innerHTML           = cfg.tipRic;
+  document.getElementById('tip-ing').innerHTML           = cfg.tipIng;
+  document.getElementById('tip-prop').innerHTML          = cfg.tipProp;
+  document.getElementById('tip-funnel').innerHTML        = cfg.tipFunnel;
+  // Ri-renderizza KPI tab
+  if (kpiData) {
+    if (kpiData.ricordo)     renderRicordo(kpiData.ricordo);
+    if (kpiData.ingaggio)    renderIngaggio(kpiData.ingaggio);
+    if (kpiData.propensione) renderPropensione(kpiData.propensione);
+  }
+  // Ri-renderizza Funnel Matrix solo se già caricato (lazy)
+  if (funnelRendered && kpiData) {
+    const funnelRows = buildFunnelData();
+    if (funnelRows && funnelRows.length) renderFunnelMatrix(funnelRows);
+  }
+  lucide.createIcons();
+}
+
+function renderRicordo(data) {
+  const penMap = _buildPenMap();
+  const isImpatto = (kpiMode === 'impatto');
+
+  // Ordina per il valore visualizzato (condizionato o assoluto)
+  const sorted = [...data].sort((a, b) => {
+    const keyA = a['Canale_std'] || a['Canale'];
+    const keyB = b['Canale_std'] || b['Canale'];
+    const va = isImpatto ? (a['Ricordo (%)'] || 0) * (penMap[keyA] || 0) / 100 : (a['Ricordo (%)'] || 0);
+    const vb = isImpatto ? (b['Ricordo (%)'] || 0) * (penMap[keyB] || 0) / 100 : (b['Ricordo (%)'] || 0);
+    return va - vb;
+  });
+
+  const canali = sorted.map(r => r['Canale_std'] || r['Canale']);
+
+  // Calcola valori per le 2 modalità
+  const ric = sorted.map(r => {
+    const c = r['Canale_std'] || r['Canale'];
+    const v = r['Ricordo (%)'] || 0;
+    return isImpatto ? Math.round(v * (penMap[c] || 0) / 100 * 10) / 10 : v;
+  });
+  const nonRic = sorted.map((r, i) => {
+    const c = r['Canale_std'] || r['Canale'];
+    if (isImpatto) {
+      // HCP esposti ma non ricordano (= pen - ric_assoluto)
+      return Math.round(Math.max(0, (penMap[c] || 0) - ric[i]) * 10) / 10;
+    }
+    return r['Non ricordo (%)'] || 0;
+  });
+
+  // Hover "su 100 medici" — presente in entrambe le modalità
+  const hoverRic = sorted.map((r, i) => {
+    const c   = r['Canale_std'] || r['Canale'];
+    const pen = penMap[c] || 0;
+    const ricCond = r['Ricordo (%)'] || 0;
+    const ricAbs  = Math.round(ricCond * pen / 100 * 10) / 10;
+    if (isImpatto) {
+      return `<b>${c}</b><br>Impatto reale: <b>${ric[i].toFixed(1)}%</b> su tot. HCP`
+           + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Ricordo esposti: ${ricCond.toFixed(1)}% × Pen: ${pen.toFixed(0)}%</span><extra></extra>`;
+    }
+    return `<b>${c}</b><br>Ricorda (esposti): <b>${ricCond.toFixed(1)}%</b>`
+         + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Su 100 HCP: ${pen.toFixed(0)} esposti → ${ricAbs.toFixed(0)} ricordano</span><extra></extra>`;
+  });
+  const hoverNonRic = sorted.map((r, i) => {
+    const c = r['Canale_std'] || r['Canale'];
+    return isImpatto
+      ? `<b>${c}</b><br>Esposti ma non ricordano: <b>${nonRic[i].toFixed(1)}%</b><extra></extra>`
+      : `<b>${c}</b><br>Non ricorda (esposti): <b>${nonRic[i].toFixed(1)}%</b><extra></extra>`;
+  });
+
+  const el = document.getElementById('chart-ric');
+  if (el) el.innerHTML = '';
+  plot('chart-ric', [
+    { type:'bar', orientation:'h', name: isImpatto ? 'Ricordano' : 'Ricorda',
+      x: ric, y: canali, marker:{ color: C.success },
+      text: ric.map(v => v.toFixed(1) + '%'), textposition: 'auto',
+      hovertemplate: hoverRic },
+    { type:'bar', orientation:'h', name: isImpatto ? 'Esposti / non ricordano' : 'Non ricorda',
+      x: nonRic, y: canali, marker:{ color: 'rgba(255,255,255,0.08)' },
+      hovertemplate: hoverNonRic },
+  ], baseLayout({ barmode:'stack', showlegend:true,
+    legend:{ orientation:'h', y:-0.12, font:{size:10}, bgcolor:'transparent' },
+    margin:{ t:20, r:20, b:60, l:180 } }));
+}
+
+function renderIngaggio(data) {
+  const penMap = _buildPenMap();
+  const isImpatto = (kpiMode === 'impatto');
+
+  const sorted = [...data].sort((a, b) => {
+    const keyA = a['Canale_std'] || a['Canale'];
+    const keyB = b['Canale_std'] || b['Canale'];
+    const va = isImpatto ? (a['Ingaggio totale (%)'] || 0) * (penMap[keyA] || 0) / 100 : (a['Ingaggio totale (%)'] || 0);
+    const vb = isImpatto ? (b['Ingaggio totale (%)'] || 0) * (penMap[keyB] || 0) / 100 : (b['Ingaggio totale (%)'] || 0);
+    return va - vb;
+  });
+
+  const canali = sorted.map(r => r['Canale_std'] || r['Canale']);
+
+  const _abs = (val, canale) => isImpatto
+    ? Math.round((val || 0) * (penMap[canale] || 0) / 100 * 10) / 10
+    : (val || 0);
+
+  const condiviso = sorted.map(r => _abs(r['Condiviso (%)'],    r['Canale_std'] || r['Canale']));
+  const approfond = sorted.map(r => _abs(r['Approfondito (%)'], r['Canale_std'] || r['Canale']));
+  const nulla     = sorted.map(r => _abs(r['Nulla (%)'],        r['Canale_std'] || r['Canale']));
+
+  // Hover "su 100 medici"
+  const hoverIng = (kpiKey, label) => sorted.map((r, i) => {
+    const c    = r['Canale_std'] || r['Canale'];
+    const pen  = penMap[c] || 0;
+    const cond = r[kpiKey] || 0;
+    const abs  = Math.round(cond * pen / 100 * 10) / 10;
+    if (isImpatto) {
+      return `<b>${c}</b><br>${label} (reale): <b>${(isImpatto ? _abs(cond, c) : cond).toFixed(1)}%</b> su tot. HCP`
+           + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Esposti: ${cond.toFixed(1)}% × Pen: ${pen.toFixed(0)}%</span><extra></extra>`;
+    }
+    return `<b>${c}</b><br>${label} (esposti): <b>${cond.toFixed(1)}%</b>`
+         + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Su 100 HCP: ${pen.toFixed(0)} esposti → ${abs.toFixed(0)} si ingaggiano</span><extra></extra>`;
+  });
+
+  const el = document.getElementById('chart-ing');
+  if (el) el.innerHTML = '';
+  plot('chart-ing', [
+    { type:'bar', orientation:'h', name:'Condiviso',    x: condiviso, y: canali, marker:{color: C.accent},
+      hovertemplate: hoverIng('Condiviso (%)',    'Condivisione') },
+    { type:'bar', orientation:'h', name:'Approfondito', x: approfond, y: canali, marker:{color: C.blue},
+      hovertemplate: hoverIng('Approfondito (%)', 'Approfondimento') },
+    { type:'bar', orientation:'h', name:'Nulla',        x: nulla,     y: canali, marker:{color:'rgba(255,255,255,0.08)'},
+      hovertemplate: hoverIng('Nulla (%)',         'Nessun ingaggio') },
+  ], baseLayout({ barmode:'stack', showlegend:true,
+    legend:{orientation:'h', y:-0.12, font:{size:10}, bgcolor:'transparent'},
+    margin:{t:20, r:20, b:60, l:180} }));
+}
+
+function renderPropensione(data) {
+  const penMap    = _buildPenMap();
+  const isImpatto = (kpiMode === 'impatto');
+
+  // In modalità Impatto: valore pesato = score × Penetrazione / 10
+  // (scala normalizzata: score 10 × pen 100% = 100 → massimo teorico)
+  const sorted = [...data].sort((a, b) => {
+    const keyA = a['Canale_std'] || a['Canale'];
+    const keyB = b['Canale_std'] || b['Canale'];
+    const sa = a['Probabilità media consiglio'] || 0;
+    const sb = b['Probabilità media consiglio'] || 0;
+    const va = isImpatto ? sa * (penMap[keyA] || 0) / 10 : sa;
+    const vb = isImpatto ? sb * (penMap[keyB] || 0) / 10 : sb;
+    return va - vb;
+  });
+
+  const canali = sorted.map(r => r['Canale_std'] || r['Canale']);
+  const vals = sorted.map(r => {
+    const c = r['Canale_std'] || r['Canale'];
+    const s = r['Probabilità media consiglio'] || 0;
+    return isImpatto ? Math.round(s * (penMap[c] || 0) / 10 * 10) / 10 : s;
+  });
+
+  // Colori: efficacia → soglie su score 0-10; impatto → soglie su score pesato 0-100
+  const colors = sorted.map((r, i) => {
+    if (isImpatto) return vals[i] >= 56 ? C.success : vals[i] >= 35 ? C.warning : '#e53e3e';
+    return vals[i] >= 7 ? C.success : vals[i] >= 5 ? C.warning : '#e53e3e';
+  });
+
+  // Hover "su 100 medici"
+  const hover = sorted.map((r, i) => {
+    const c   = r['Canale_std'] || r['Canale'];
+    const pen = penMap[c] || 0;
+    const s   = r['Probabilità media consiglio'] || 0;
+    if (isImpatto) {
+      return `<b>${c}</b><br>Score pesato: <b>${vals[i].toFixed(1)}</b> (su scala 0–100)`
+           + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Score esposti: ${s.toFixed(1)}/10 × reach ${pen.toFixed(0)}%</span><extra></extra>`;
+    }
+    return `<b>${c}</b><br>Propensione (esposti): <b>${s.toFixed(1)} / 10</b>`
+         + `<br><span style="color:rgba(255,255,255,0.4);font-size:10px">Su 100 HCP: ${pen.toFixed(0)} esposti → score medio ${s.toFixed(1)}</span><extra></extra>`;
+  });
+
+  const el = document.getElementById('chart-prop');
+  if (el) el.innerHTML = '';
+  plot('chart-prop', [{
+    type:'bar', orientation:'h',
+    x: vals, y: canali,
+    marker: { color: colors, opacity: 0.85 },
+    text: vals.map(v => v != null ? v.toFixed(1) + (isImpatto ? '' : '/10') : ''),
+    textposition: 'outside',
+    hovertemplate: hover,
+  }], baseLayout({
+    xaxis: { range: [0, isImpatto ? 110 : 11] },
+    margin: { t:20, r:60, b:30, l:180 }
+  }));
+}
+
+function renderNPS(data) {
+  const rows = [...data].sort((a,b) => a['NPS'] - b['NPS']);
+  const canali = rows.map(r => r['Canale_std'] || r['Canale']);
+  const nps    = rows.map(r => r['NPS']);
+  const colors = nps.map(v => v >= 0 ? C.success : '#e53e3e');
+  plot('chart-nps', [{
+    type:'bar', orientation:'h',
+    x: nps, y: canali,
+    marker: { color: colors, opacity: 0.85 },
+    text: nps.map(v => v != null ? (v >= 0 ? '+' : '') + v.toFixed(1) : ''),
+    textposition:'outside',
+    hovertemplate:'<b>%{y}</b><br>NPS: %{x:.1f}<extra></extra>',
+  }], baseLayout({ shapes:[{type:'line',x0:0,x1:0,y0:-0.5,y1:rows.length-0.5,
+    line:{color:'rgba(255,255,255,0.15)',width:1,dash:'dot'}}],
+    margin:{t:20, r:70, b:30, l:180} }));
+}
+
+function renderFasce(data) {
+  const rows  = [...data].sort((a,b) => (a['Indispensabile (%)']||0) - (b['Indispensabile (%)']||0));
+  const canali = rows.map(r => r['Canale_std'] || r['Canale']);
+  const fasceConfig = [
+    { key:'Indispensabile (%)',  color:'#02C39A', name:'Indispensabile (7)' },
+    { key:'Molto utile (%)',     color:'#00A896', name:'Molto utile (6)' },
+    { key:'Utile (%)',           color:'#028090', name:'Utile (5)' },
+    { key:'Poco utile (%)',      color:'#F77F00', name:'Poco utile (3-4)' },
+    { key:'Non utile (%)',       color:'#e53e3e', name:'Non utile (1-2)' },
+  ];
+  const traces = fasceConfig.map(f => ({
+    type:'bar', orientation:'h', name: f.name,
+    x: rows.map(r => r[f.key] || 0), y: canali,
+    marker: { color: f.color },
+    hovertemplate: '<b>%{y}</b><br>' + f.name + ': %{x:.1f}%<extra></extra>',
+  }));
+  plot('chart-fasce', traces, baseLayout({ barmode:'stack', showlegend:true,
+    legend:{orientation:'h', y:-0.15, font:{size:9}, bgcolor:'transparent'},
+    margin:{t:20, r:20, b:70, l:180} }));
+}
+
+
+// ──────────────────────────────────────────────────────
+// GRAFICI MAPPA
+// ──────────────────────────────────────────────────────
+
+function renderMappe(mappa) {
+  const pen  = mappa.map(r => r['Penetrazione (%)']);
+  const util = mappa.map(r => r['Utilità media (1-7)']);
+  const ing  = mappa.map(r => r['Ingaggio totale (%)']);
+  const nomi = mappa.map(r => r['Canale']);
+
+  // Mappa 1: Utilità vs Penetrazione
+  const avgPen  = pen.reduce((a,b) => a + (b||0), 0) / pen.length;
+  const avgUtil = util.reduce((a,b) => a + (b||0), 0) / util.length;
+
+  plot('chart-mappa1', [{
+    type:'scatter', mode:'markers+text',
+    x: pen, y: util, text: nomi,
+    textposition:'top center',
+    textfont: { size: 9, color: 'rgba(255,255,255,0.6)' },
+    marker: { size: 12, color: C.accent, opacity: 0.8,
+      line: { color: 'rgba(255,255,255,0.2)', width: 1 } },
+    hovertemplate: '<b>%{text}</b><br>Penetrazione: %{x:.1f}%<br>Utilità: %{y:.2f}<extra></extra>',
+  }], { ...baseLayout({
+    xaxis:{ title:'Penetrazione (%)', gridcolor:C.grid },
+    yaxis:{ title:'Utilità media (1-7)', gridcolor:C.grid },
+    margin:{t:20, r:20, b:50, l:60},
+    shapes:[
+      {type:'line', x0:avgPen, x1:avgPen, y0:0, y1:7, line:{color:'rgba(255,255,255,0.1)',dash:'dot'}},
+      {type:'line', x0:0, x1:100, y0:avgUtil, y1:avgUtil, line:{color:'rgba(255,255,255,0.1)',dash:'dot'}},
+    ]
+  })});
+
+  // Mappa 2: Ingaggio vs Utilità
+  const avgIng  = ing.reduce((a,b) => a + (b||0), 0) / ing.length;
+  plot('chart-mappa2', [{
+    type:'scatter', mode:'markers+text',
+    x: util, y: ing, text: nomi,
+    textposition:'top center',
+    textfont: { size: 9, color: 'rgba(255,255,255,0.6)' },
+    marker: { size: 12, color: C.warning, opacity: 0.8,
+      line: { color: 'rgba(255,255,255,0.2)', width: 1 } },
+    hovertemplate: '<b>%{text}</b><br>Utilità: %{x:.2f}<br>Ingaggio: %{y:.1f}%<extra></extra>',
+  }], { ...baseLayout({
+    xaxis:{ title:'Utilità media (1-7)', gridcolor:C.grid },
+    yaxis:{ title:'Ingaggio totale (%)', gridcolor:C.grid },
+    margin:{t:20, r:20, b:50, l:60},
+    shapes:[
+      {type:'line', x0:avgUtil, x1:avgUtil, y0:0, y1:100, line:{color:'rgba(255,255,255,0.1)',dash:'dot'}},
+      {type:'line', x0:0, x1:7, y0:avgIng, y1:avgIng, line:{color:'rgba(255,255,255,0.1)',dash:'dot'}},
+    ]
+  })});
+}
+
+// ──────────────────────────────────────────────────────
+// GRAFICI OCV
+// ──────────────────────────────────────────────────────
+
+function ocvBarLayout(extra = {}) {
+  return baseLayout({
+    margin: { t: 20, r: 90, b: 30, l: 260 },
+    yaxis: { tickfont: { size: 10 }, automargin: true },
+    ...extra,
+  });
+}
+
+function renderOCV(ocv) {
+  // ── KPI cards ──────────────────────────────────────
+  const d = ocv.delta || {};
+  const r1 = d['Recall 1 Channel'];
+  const r3 = d['Recall ≥3 Channels'];
+  const dt = d['OCV Delta (%)'];
+
+  document.getElementById('ocv-recall1').textContent =
+    r1 != null ? r1.toFixed(1) + '%' : '—';
+  document.getElementById('ocv-recall3').textContent =
+    r3 != null ? r3.toFixed(1) + '%' : '—';
+  document.getElementById('ocv-delta-val').textContent =
+    dt != null ? (dt >= 0 ? '+' : '') + dt.toFixed(1) + '%' : '—';
+
+  // Best combo card — aggiornato in base al modo corrente da setOcvMode
+  _updateOcvBestCard();
+
+  // Reset toggle al modo 'ocv' ad ogni nuova analisi
+  _applyOcvModeUI();
+
+  // Render grafici + tabella
+  _renderOcvCharts();
+}
+
+/**
+ * Aggiorna il pill toggle e la best-combo card senza ri-fetchare i dati.
+ * Chiamato anche da setOcvMode().
+ */
+function setOcvMode(mode) {
+  ocvMode = mode;
+  _applyOcvModeUI();
+  if (ocvData) {
+    _updateOcvBestCard();
+    _renderOcvCharts();
+  }
+}
+
+function _applyOcvModeUI() {
+  const btnOcv     = document.getElementById('ocv-mode-btn-ocv');
+  const btnImpatto = document.getElementById('ocv-mode-btn-impatto');
+  if (!btnOcv) return;
+  if (ocvMode === 'ocv') {
+    btnOcv.classList.add('active');
+    btnImpatto.classList.remove('active');
+    document.getElementById('ocv-chart1-title').textContent = 'Top 10 per Valore OCV (%)';
+    document.getElementById('ocv-chart1-tip').textContent   = 'Le 10 combinazioni con il più alto Omni-Channel Value: incremento % del ricordo col mix vs la media dei singoli canali. Valori positivi = sinergia.';
+    document.getElementById('ocv-table-title').textContent  = 'Top 10 Mix — Ordinati per Frequenza (N Medici)';
+    document.getElementById('ocv-table-tip').textContent    = 'Le 10 combinazioni più frequenti nel campione con relativo OCV e raccomandazione strategica.';
+    document.getElementById('ocv-col-main').textContent     = 'OCV (%)';
+    document.getElementById('ocv-col-recall-ass').style.display = 'none';
+  } else {
+    btnImpatto.classList.add('active');
+    btnOcv.classList.remove('active');
+    document.getElementById('ocv-chart1-title').textContent = 'Top 10 per Impatto Reale — Recall su universo HCP (%)';
+    document.getElementById('ocv-chart1-tip').textContent   = 'Le 10 combinazioni con il più alto Recall Assoluto: % di HCP totali (non solo esposti) che ricordano il messaggio grazie a questo mix. Formula: Penetrazione mix × Recall mix / 100.';
+    document.getElementById('ocv-table-title').textContent  = 'Top 10 Mix — Ordinati per Impatto Reale (Recall su universo HCP)';
+    document.getElementById('ocv-table-tip').textContent    = 'Le 10 combinazioni con il massimo Recall Assoluto: quanti medici su 100 totali ricordano il messaggio passato per questo mix.';
+    document.getElementById('ocv-col-main').textContent     = 'OCV (%)';
+    document.getElementById('ocv-col-recall-ass').style.display = '';
+  }
+}
+
+function _updateOcvBestCard() {
+  if (!ocvData) return;
+  if (ocvMode === 'ocv' && ocvData.best && ocvData.best.mix) {
+    const b = ocvData.best;
+    document.getElementById('ocv-best-mix').textContent    = b.mix;
+    document.getElementById('ocv-best-val').textContent    = 'OCV: ' + (b.ocv >= 0 ? '+' : '') + b.ocv + '%';
+    document.getElementById('ocv-best-action').textContent = b.action;
+    document.querySelector('#ocv-best-mix').closest('.kpi-card')
+      .querySelector('.text-\\[11px\\]').textContent = 'Best Mix per Valore OCV';
+  } else if (ocvMode === 'impatto' && ocvData.best_impatto && ocvData.best_impatto.mix) {
+    const b = ocvData.best_impatto;
+    const n100 = Math.round(b.recall_ass);
+    document.getElementById('ocv-best-mix').textContent    = b.mix;
+    document.getElementById('ocv-best-val').textContent    =
+      `Su 100 medici: ${Math.round(b.pen_mix)} esposti → ${n100} ricordano il messaggio`;
+    document.getElementById('ocv-best-action').textContent = b.action;
+    document.querySelector('#ocv-best-mix').closest('.kpi-card')
+      .querySelector('.text-\\[11px\\]').textContent = 'Best Mix per Impatto Reale';
+  }
+}
+
+function _renderOcvCharts() {
+  if (!ocvData) return;
+  const ocv      = ocvData;
+  const nTot     = ocv.n_hcp_total || 1;
+  const isImp    = (ocvMode === 'impatto');
+
+  // ── Grafico 1: OCV% oppure Recall Assoluto ─────────
+  const src1 = isImp
+    ? (ocv.top10_impatto || [])
+    : (ocv.mix || []);
+
+  if (src1.length) {
+    const rows1  = isImp
+      ? [...src1].sort((a, b) => (a['Recall Assoluto (%)'] || 0) - (b['Recall Assoluto (%)'] || 0))
+      : [...src1].sort((a, b) => (a['OCV (%)'] || 0) - (b['OCV (%)'] || 0));
+
+    const mixes1 = rows1.map(r => r['Channel Mix'] || '');
+    const vals1  = isImp
+      ? rows1.map(r => r['Recall Assoluto (%)'] || 0)
+      : rows1.map(r => r['OCV (%)'] || 0);
+    const ric1   = rows1.map(r => r['Recall Mix (%)'] || 0);
+    const nhcp1  = rows1.map(r => r['N HCP'] || 0);
+    const ocvv1  = rows1.map(r => r['OCV (%)'] || 0);
+    const colors1 = isImp
+      ? vals1.map(v => v >= 30 ? C.success : v >= 15 ? C.accent : '#8b5cf6')
+      : vals1.map(v => v >= 20 ? C.success : v >= 0 ? C.accent : '#e53e3e');
+
+    const hoverFn1 = (i) => isImp
+      ? `Su 100 medici: ${Math.round(nhcp1[i] / nTot * 100)} esposti → ${vals1[i].toFixed(1)} ricordano | OCV: ${ocvv1[i] >= 0 ? '+' : ''}${ocvv1[i].toFixed(1)}%`
+      : `Su 100 medici: ${Math.round(nhcp1[i] / nTot * 100)} esposti → ${(nhcp1[i] / nTot * ric1[i] / 100).toFixed(1)} ricordano | OCV: ${vals1[i] >= 0 ? '+' : ''}${vals1[i].toFixed(1)}%`;
+
+    plot('chart-ocv-mix', [{
+      type: 'bar', orientation: 'h',
+      x: vals1, y: mixes1,
+      marker: { color: colors1, opacity: 0.88 },
+      text: vals1.map((v, i) => isImp ? v.toFixed(1) + '%' : (v >= 0 ? '+' : '') + v.toFixed(1) + '%'),
+      textposition: 'outside',
+      customdata: vals1.map((v, i) => hoverFn1(i)),
+      hovertemplate: '<b>%{y}</b><br>%{customdata}<extra></extra>',
+    }], ocvBarLayout({
+      xaxis: { title: isImp ? 'Recall Assoluto (%)' : 'OCV (%)', gridcolor: C.grid }
+    }));
+  }
+
+  // ── Grafico 2: Top 10 per N HCP (colorato per recall_ass in impatto, OCV in standard)
+  if (ocv.top10_freq && ocv.top10_freq.length) {
+    const rows2 = [...ocv.top10_freq].sort((a, b) => (a['N HCP'] || 0) - (b['N HCP'] || 0));
+    const mixes2 = rows2.map(r => r['Channel Mix'] || '');
+    const nhcp2  = rows2.map(r => r['N HCP'] || 0);
+    const ocvV2  = rows2.map(r => r['OCV (%)'] || 0);
+    const rass2  = rows2.map(r => r['Recall Assoluto (%)'] || (nhcp2[0] / nTot * (r['Recall Mix (%)'] || 0) / 100));
+    const colors2 = isImp
+      ? rass2.map(v => v >= 30 ? C.success : v >= 15 ? C.accent : '#8b5cf6')
+      : ocvV2.map(v => v >= 20 ? C.success : v >= 0 ? C.accent : '#e53e3e');
+
+    plot('chart-ocv-freq', [{
+      type: 'bar', orientation: 'h',
+      x: nhcp2, y: mixes2,
+      marker: { color: colors2, opacity: 0.80 },
+      text: nhcp2.map(v => v.toLocaleString()),
+      textposition: 'outside',
+      customdata: nhcp2.map((n, i) => isImp
+        ? `Su 100 medici: ${Math.round(n / nTot * 100)} esposti → ${rass2[i].toFixed(1)} ricordano`
+        : `N Medici: ${n.toLocaleString()} | OCV: ${ocvV2[i] >= 0 ? '+' : ''}${ocvV2[i].toFixed(1)}%`),
+      hovertemplate: '<b>%{y}</b><br>%{customdata}<extra></extra>',
+    }], ocvBarLayout({
+      xaxis: { title: 'N Medici esposti al mix', gridcolor: C.grid },
+    }));
+  }
+
+  // ── Tabella ─────────────────────────────────────────
+  const tblSrc = isImp
+    ? (ocv.top10_impatto || ocv.top10_freq || [])
+    : (ocv.top10_freq || []);
+
+  if (tblSrc.length) {
+    const tbody = document.getElementById('tbody-ocv');
+    tbody.innerHTML = tblSrc.map((r, i) => {
+      const ocvV    = r['OCV (%)'] || 0;
+      const rass    = r['Recall Assoluto (%)'] || 0;
+      const ocvCls  = ocvV >= 20 ? 'text-success font-bold' : ocvV >= 0 ? 'text-accent font-semibold' : 'text-red-400 font-semibold';
+      const rassCls = rass >= 30 ? 'text-success font-bold' : rass >= 15 ? 'text-accent font-semibold' : 'text-purple-400 font-semibold';
+      const badgeCls = ocvV >= 20 ? 'badge-accent' : ocvV >= 0 ? 'badge-muted' : 'badge-warning';
+      const rankColor = i === 0 ? 'text-warning' : i < 3 ? 'text-white/60' : 'text-white/25';
+      const n100exp = Math.round((r['N HCP'] || 0) / nTot * 100);
+      return `<tr title="Su 100 medici: ${n100exp} esposti → ${rass.toFixed(1)} ricordano il messaggio">
+        <td>
+          <div class="flex items-start gap-2">
+            <span class="text-xs font-bold ${rankColor} mt-0.5 w-4 flex-shrink-0">${i + 1}</span>
+            <span class="text-white/85 text-xs leading-relaxed">${r['Channel Mix'] || ''}</span>
+          </div>
+        </td>
+        <td class="text-center text-white/50">${r['N Channels'] || ''}</td>
+        <td class="text-center font-semibold text-white">${(r['N HCP'] || 0).toLocaleString()}</td>
+        <td class="text-center text-white/70">${(r['Recall Mix (%)'] || 0).toFixed(1)}%</td>
+        <td class="text-center ${ocvCls}">${(ocvV >= 0 ? '+' : '') + ocvV.toFixed(1)}%</td>
+        <td class="text-center ${rassCls}" style="display:${isImp ? '' : 'none'}">${rass.toFixed(1)}%</td>
+        <td class="text-center"><span class="badge ${badgeCls} text-[10px]">${(r['OCV Class'] || '').replace('OCV','').trim()}</span></td>
+        <td class="text-white/55 text-xs">${r['Business Action'] || ''}</td>
+      </tr>`;
+    }).join('');
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// FUNNEL HCP — Customer Journey Visualization
+// ──────────────────────────────────────────────────────
+
+/** Converte hex in rgba string, es. '#00A896' → 'rgba(0,168,150,0.4)' */
+function hexToRgba(hex, alpha) {
+  const h = hex.replace('#', '');
+  return `rgba(${parseInt(h.slice(0,2),16)},${parseInt(h.slice(2,4),16)},${parseInt(h.slice(4,6),16)},${alpha})`;
+}
+
+/**
+ * buildFunnelData() — computa i valori funnel per ogni canale
+ * a partire da kpiData (già caricato da loadAll).
+ * Restituisce array di oggetti { canale, N_exposed, N_recall, N_engaged, N_prop_high }
+ */
+function buildFunnelData() {
+  if (!kpiData || !kpiData.penetrazione) return [];
+
+  const n_hcp = kpiData.n_hcp || 0;
+  const pen   = kpiData.penetrazione || [];
+  const ric   = kpiData.ricordo     || [];
+  const ing   = kpiData.ingaggio    || [];
+  const nps   = kpiData.nps         || [];
+
+  // Lookup map: canale → KPI value
+  const ricMap = {};
+  ric.forEach(r => { ricMap[r['Canale_std'] || r['Canale']] = r['Ricordo (%)'] || 0; });
+
+  const ingMap = {};
+  ing.forEach(r => { ingMap[r['Canale_std'] || r['Canale']] = r['Ingaggio totale (%)'] || 0; });
+
+  // Promoters (9-10) + Passives (7-8) = quota con propensione ≥7
+  const propHighMap = {};
+  nps.forEach(r => {
+    const name = r['Canale_std'] || r['Canale'];
+    propHighMap[name] = (r['Promoters (%)'] || 0) + (r['Passives (%)'] || 0);
+  });
+
+  return pen.map(r => {
+    const canale     = r['Canale_std'] || r['Canale'];
+    const penPct     = r['Penetrazione (%)'] || 0;
+    const ricPct     = ricMap[canale]     || 0;
+    const ingPct     = ingMap[canale]     || 0;
+    const propHPct   = propHighMap[canale] || 0; // % di esposti con score ≥7
+
+    const N_exposed   = Math.round(n_hcp * penPct  / 100);
+    const N_recall    = Math.round(n_hcp * ricPct   / 100);
+    const N_engaged   = Math.round(n_hcp * ingPct   / 100);
+    const N_prop_high = Math.round(N_exposed * propHPct / 100);
+
+    return { canale, penPct, ricPct, ingPct,
+             N_exposed, N_recall, N_engaged, N_prop_high };
+  }).filter(r => r.N_exposed > 0);
+}
+
+/**
+ * renderFunnelMatrix() — stacked horizontal bar chart
+ * 4 segmenti per canale: Alta Prop. | Ingaggiati | Ricordano | Solo raggiunti
+ * Ordinati ascending → max in cima (regola Plotly barre orizzontali)
+ */
+function renderFunnelMatrix(rows) {
+  const isImpatto = (kpiMode === 'impatto');
+  const n_hcp     = (kpiData && kpiData.n_hcp) || 1;
+
+  // Ordina sempre per N_exposed descrescente (max in cima = ascending Plotly)
+  const sorted = [...rows].sort((a, b) => a.N_exposed - b.N_exposed);
+  const canali = sorted.map(r => r.canale);
+
+  // ── Valori: N assoluti (efficacia) o % su universo (impatto) ──
+  const _v = (n) => isImpatto ? Math.round(n / n_hcp * 1000) / 10 : n;
+
+  const vAlta = sorted.map(r => _v(r.N_prop_high));
+  const vIng  = sorted.map(r => _v(Math.max(0, r.N_engaged  - r.N_prop_high)));
+  const vRic  = sorted.map(r => _v(Math.max(0, r.N_recall   - r.N_engaged)));
+  const vSolo = sorted.map(r => _v(Math.max(0, r.N_exposed  - r.N_recall)));
+
+  // ── Hover arricchito "su 100 medici" con tassi di conversione ──
+  const hoverFor = (stageName, getN) => sorted.map(r => {
+    const exp  = r.N_exposed;
+    const rec  = r.N_recall;
+    const eng  = r.N_engaged;
+    const prop = r.N_prop_high;
+    const n    = getN(r);
+
+    const convRec  = exp  > 0 ? (rec  / exp  * 100).toFixed(1) : '—';
+    const convEng  = rec  > 0 ? (eng  / rec  * 100).toFixed(1) : '—';
+    const convProp = eng  > 0 ? (prop / eng  * 100).toFixed(1) : '—';
+    const pct100   = (n   / n_hcp * 100).toFixed(1);
+
+    const label = isImpatto
+      ? `<b>${stageName}</b>: <b>${_v(n).toFixed(1)}%</b> su tot. HCP`
+      : `<b>${stageName}</b>: <b>${n.toLocaleString()}</b> HCP`;
+
+    return `<b>${r.canale}</b><br>${label}`
+      + `<br><span style="color:rgba(255,255,255,0.35);font-size:10px">`
+      + `Su 100 HCP: ${(exp/n_hcp*100).toFixed(0)} esposti`
+      + ` → ${(rec/n_hcp*100).toFixed(0)} ricordano (conv. ${convRec}%)`
+      + ` → ${(eng/n_hcp*100).toFixed(0)} ingaggiati (conv. ${convEng}%)`
+      + ` → ${(prop/n_hcp*100).toFixed(0)} alta prop. (conv. ${convProp}%)`
+      + `</span><extra></extra>`;
+  });
+
+  const xLabel = isImpatto ? '% su Universo HCP' : 'N HCP';
+  const xFmt   = isImpatto ? '.1f' : ',d';
+
+  const el = document.getElementById('chart-funnel-matrix');
+  if (el) el.innerHTML = '';
+  plot('chart-funnel-matrix', [
+    { type:'bar', orientation:'h', name:'Alta Propensione ≥7',
+      x: vAlta, y: canali, marker:{ color: C.success, opacity: 0.90 },
+      hovertemplate: hoverFor('Alta Propensione ≥7', r => r.N_prop_high) },
+    { type:'bar', orientation:'h', name:'Ingaggiati',
+      x: vIng, y: canali, marker:{ color: C.warning, opacity: 0.85 },
+      hovertemplate: hoverFor('Ingaggiati', r => Math.max(0, r.N_engaged - r.N_prop_high)) },
+    { type:'bar', orientation:'h', name:'Ricordano',
+      x: vRic, y: canali, marker:{ color: C.blue, opacity: 0.80 },
+      hovertemplate: hoverFor('Ricordano', r => Math.max(0, r.N_recall - r.N_engaged)) },
+    { type:'bar', orientation:'h', name:'Solo raggiunti',
+      x: vSolo, y: canali, marker:{ color: 'rgba(255,255,255,0.11)', opacity: 1 },
+      hovertemplate: hoverFor('Solo raggiunti', r => Math.max(0, r.N_exposed - r.N_recall)) },
+  ], baseLayout({
+    barmode: 'stack', showlegend: true,
+    legend:  { orientation:'h', y:-0.10, font:{size:10}, bgcolor:'transparent' },
+    xaxis:   { title: xLabel, gridcolor: C.grid, tickformat: xFmt,
+               ticksuffix: isImpatto ? '%' : '' },
+    margin:  { t:20, r:30, b:55, l:185 },
+  }));
+}
+
+/**
+ * renderSankey() — Diagramma di Sankey Plotly
+ * Top 8 canali (per N_exposed) come nodi sorgente →
+ * Ricordano / Non ricordano →
+ * Ingaggiati / Non ingaggiati →
+ * Alta Propensione / Bassa Propensione
+ */
+function renderSankey(rows) {
+  if (!rows || rows.length < 2) return;
+
+  // Top 8 per N_exposed (decrescente)
+  const top8 = [...rows].sort((a, b) => b.N_exposed - a.N_exposed).slice(0, 8);
+  const nCh  = top8.length;
+
+  // Aggregati dai top-8
+  const totRecall   = top8.reduce((s, r) => s + r.N_recall, 0);
+  const totNRecall  = top8.reduce((s, r) => s + Math.max(0, r.N_exposed - r.N_recall), 0);
+  const totEngaged  = top8.reduce((s, r) => s + r.N_engaged, 0);
+  const totNEngage  = Math.max(0, totRecall - totEngaged);
+  const totPropHi   = top8.reduce((s, r) => s + r.N_prop_high, 0);
+  const totPropLo   = Math.max(0, totEngaged - totPropHi);
+
+  // Indici nodi
+  const I_NRIC  = nCh;
+  const I_RIC   = nCh + 1;
+  const I_NING  = nCh + 2;
+  const I_ING   = nCh + 3;
+  const I_LPROP = nCh + 4;
+  const I_HPROP = nCh + 5;
+
+  const nodeLabels = [
+    ...top8.map(r => r.canale),
+    'Non ricordano', 'Ricordano',
+    'Non ingaggiati', 'Ingaggiati',
+    'Bassa Propensione', 'Alta Propensione ≥7',
+  ];
+
+  const nodeColors = [
+    ...top8.map((_, i) => PALETTE[i % PALETTE.length]),
+    'rgba(255,255,255,0.15)',  // Non ricordano
+    hexToRgba(C.blue, 0.85),   // Ricordano
+    'rgba(255,255,255,0.15)',  // Non ingaggiati
+    hexToRgba(C.warning, 0.85),// Ingaggiati
+    'rgba(255,255,255,0.20)',  // Bassa Propensione
+    hexToRgba(C.success, 0.90),// Alta Propensione ≥7
+  ];
+
+  const sources = [], targets = [], values = [], linkColors = [];
+
+  // Canale → Ricordano / Non ricordano
+  top8.forEach((r, i) => {
+    const ric  = r.N_recall;
+    const nric = Math.max(0, r.N_exposed - r.N_recall);
+    const chCol = PALETTE[i % PALETTE.length];
+    if (ric  > 0) { sources.push(i); targets.push(I_RIC);  values.push(ric);  linkColors.push(hexToRgba(chCol, 0.38)); }
+    if (nric > 0) { sources.push(i); targets.push(I_NRIC); values.push(nric); linkColors.push('rgba(255,255,255,0.05)'); }
+  });
+
+  // Ricordano → Ingaggiati / Non ingaggiati
+  if (totEngaged > 0) { sources.push(I_RIC); targets.push(I_ING);  values.push(totEngaged); linkColors.push(hexToRgba(C.warning, 0.30)); }
+  if (totNEngage > 0) { sources.push(I_RIC); targets.push(I_NING); values.push(totNEngage); linkColors.push('rgba(255,255,255,0.05)'); }
+
+  // Ingaggiati → Alta / Bassa Propensione
+  if (totPropHi > 0) { sources.push(I_ING); targets.push(I_HPROP); values.push(totPropHi); linkColors.push(hexToRgba(C.success, 0.30)); }
+  if (totPropLo > 0) { sources.push(I_ING); targets.push(I_LPROP); values.push(totPropLo); linkColors.push('rgba(255,255,255,0.05)'); }
+
+  Plotly.newPlot('chart-funnel-sankey', [{
+    type: 'sankey',
+    orientation: 'h',
+    arrangement: 'snap',
+    node: {
+      pad: 14,
+      thickness: 18,
+      line: { color: 'rgba(255,255,255,0.08)', width: 0.5 },
+      label: nodeLabels,
+      color: nodeColors,
+      hovertemplate: '<b>%{label}</b><br>HCP: %{value:,}<extra></extra>',
+    },
+    link: {
+      source: sources,
+      target: targets,
+      value:  values,
+      color:  linkColors,
+      hovertemplate: '%{source.label} → %{target.label}<br><b>%{value:,} HCP</b><extra></extra>',
+    },
+  }], {
+    paper_bgcolor: C.bg,
+    plot_bgcolor:  C.bg,
+    font:   { family: 'Inter, sans-serif', size: 11, color: C.text },
+    margin: { t: 20, r: 20, b: 20, l: 20 },
+    hoverlabel: {
+      bgcolor:     '#0d1117',
+      bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+  }, { responsive: true, displayModeBar: false });
+}
+
+/**
+ * renderBestPath() — cards con i top-6 mix OCV per frequenza HCP
+ */
+function renderBestPath() {
+  const container = document.getElementById('funnel-best-path');
+  if (!ocvData || !ocvData.top10_freq || !ocvData.top10_freq.length) {
+    container.innerHTML = '<div class="col-span-3 text-white/30 text-xs italic text-center py-6">Dati OCV non disponibili per questa selezione.</div>';
+    return;
+  }
+
+  const top6 = ocvData.top10_freq.slice(0, 6);
+  const rankColors = ['text-warning', 'text-white/70', 'text-white/50', 'text-white/30', 'text-white/20', 'text-white/15'];
+
+  container.innerHTML = top6.map((r, i) => {
+    const ocvV   = r['OCV (%)'] || 0;
+    const ocvSign = ocvV >= 0 ? '+' : '';
+    const ocvCls  = ocvV >= 20 ? 'text-success' : ocvV >= 0 ? 'text-accent' : 'text-red-400';
+    const nCh     = r['N Channels'] || '';
+    const nhcp    = (r['N HCP'] || 0).toLocaleString();
+    const channels = (r['Channel Mix'] || '').split(' + ');
+    const action   = r['Business Action'] || '';
+    const rankCls  = rankColors[i] || 'text-white/15';
+
+    return `
+    <div class="rounded-xl border border-white/8 bg-white/3 p-4 hover:border-accent/30 transition-colors">
+      <div class="flex items-start justify-between mb-3">
+        <span class="text-xl font-bold ${rankCls} leading-none">#${i + 1}</span>
+        <div class="text-right">
+          <div class="${ocvCls} font-bold text-sm">${ocvSign}${ocvV.toFixed(1)}%</div>
+          <div class="text-white/25 text-[10px]">OCV</div>
+        </div>
+      </div>
+      <div class="flex flex-wrap gap-1 mb-3">
+        ${channels.map(ch => `<span class="badge badge-muted text-[10px]">${ch.trim()}</span>`).join('')}
+      </div>
+      <div class="flex items-center gap-3 text-xs text-white/40 mb-2">
+        <span class="flex items-center gap-1"><i data-lucide="users" class="w-3 h-3"></i> ${nhcp} medici</span>
+        <span class="flex items-center gap-1"><i data-lucide="layers" class="w-3 h-3"></i> ${nCh} canali</span>
+      </div>
+      <div class="text-[11px] text-white/35 leading-relaxed">${action}</div>
+    </div>`;
+  }).join('');
+
+  lucide.createIcons();
+}
+
+/**
+ * renderFunnel() — master function, lazy (chiamata solo al click sul tab)
+ * Usa kpiData + ocvData già caricati da loadAll()
+ */
+function renderFunnel() {
+  if (funnelRendered) return; // già renderizzato con i dati correnti
+  const rows = buildFunnelData();
+  if (!rows || !rows.length) return;
+
+  renderFunnelMatrix(rows);
+  renderSankey(rows);
+  renderBestPath();
+  funnelRendered = true;
+}
+
+// ──────────────────────────────────────────────────────
+// SUMMARY BAR
+// ──────────────────────────────────────────────────────
+function updateSummary(kpi) {
+  const sum = document.getElementById('kpi-summary');
+  sum.classList.remove('hidden');
+
+  // 1 — Media Penetrazione
+  const pen = kpi.penetrazione;
+  if (pen && pen.length) {
+    const avg = pen.reduce((a,r) => a + (r['Penetrazione (%)'] || 0), 0) / pen.length;
+    document.getElementById('sum-pen').textContent = avg.toFixed(1) + '%';
+    // Top canale per penetrazione
+    const top = [...pen].sort((a,b) => b['Penetrazione (%)'] - a['Penetrazione (%)'])[0];
+    document.getElementById('sum-top').textContent = top['Canale_std'] || top['Canale'] || '—';
+  }
+
+  // 2 — Media Ingaggio
+  document.getElementById('sum-ing').textContent =
+    kpi.media_ingaggio != null ? kpi.media_ingaggio + '%' : '—';
+
+  // 3 — Media Propensione
+  const prop = kpi.propensione;
+  if (prop && prop.length) {
+    const avgProp = prop.reduce((a,r) => a + (r['Probabilità media consiglio'] || 0), 0) / prop.length;
+    document.getElementById('sum-prop').textContent = avgProp.toFixed(1);
+  } else {
+    document.getElementById('sum-prop').textContent = '—';
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// EMPTY STATE / RESULTS / INSUFFICIENT DATA TOGGLE
+// ──────────────────────────────────────────────────────
+function showResults() {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.add('hidden');
+  document.getElementById('tab-container').classList.remove('hidden');
+}
+
+function showInsufficientData(nHcp, targets) {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.remove('hidden');
+  document.getElementById('tab-container').classList.add('hidden');
+  document.getElementById('kpi-summary').classList.add('hidden');
+
+  // Badge conteggio HCP
+  const plural = nHcp === 1 ? 'medico rilevato' : 'medici rilevati';
+  document.getElementById('insuf-badge').textContent = `${nHcp} ${plural}`;
+
+  // Aggiorna badge header
+  const badge = document.getElementById('hcp-count');
+  badge.textContent = nHcp + ' HCP';
+  badge.classList.remove('hidden');
+
+  // Status bar — icona warning arancione (isOk=false per non sovrascrivere colore)
+  const statusEl = document.getElementById('load-status');
+  statusEl.className = 'hidden text-xs text-warning flex items-center gap-1.5';
+  document.getElementById('load-status-icon').setAttribute('data-lucide', 'alert-triangle');
+  const spec = targets.length ? targets.join(' · ') : 'Tutti gli HCP';
+  setLoadStatus(`Campione insufficiente · ${spec}`, false);
+  lucide.createIcons();
+}
+
+function setLoadStatus(text, isOk = true) {
+  const hint   = document.getElementById('load-hint');
+  const status = document.getElementById('load-status');
+  hint.classList.add('hidden');
+  status.classList.remove('hidden');
+  // Colore e icona in base al tipo di stato
+  if (isOk) {
+    status.className = 'text-xs text-accent flex items-center gap-1.5';
+    document.getElementById('load-status-icon').setAttribute('data-lucide', 'check-circle');
+    lucide.createIcons();
+  }
+  document.getElementById('load-status-text').textContent = text;
+}
+
+// ──────────────────────────────────────────────────────
+// LOAD DATA (chiama le API)
+// ──────────────────────────────────────────────────────
+async function loadAll() {
+  const targets   = Array.from(document.getElementById('sel-spec').selectedOptions).map(o => o.value);
+  const aree      = Array.from(document.getElementById('sel-area').selectedOptions).map(o => o.value);
+  const patologie = Array.from(document.getElementById('sel-patologia').selectedOptions)
+                       .filter(o => !o.disabled).map(o => o.value);
+  currentTargets   = targets;
+  currentAree      = aree;
+  currentPatologie = patologie;
+
+  const body = JSON.stringify({ target: targets, area_terapeutica: aree, patologie });
+
+  // Mostra loading
+  const btn = document.getElementById('btn-load');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Calcolo in corso...';
+  lucide.createIcons();
+
+  try {
+    // Carica in parallelo KPI + mappa + OCV
+    const [resKpi, resMappa, resOCV] = await Promise.all([
+      fetch('/modulo1/api/kpi',   { method:'POST', headers:{'Content-Type':'application/json'}, body }),
+      fetch('/modulo1/api/mappa', { method:'POST', headers:{'Content-Type':'application/json'}, body }),
+      fetch('/modulo1/api/ocv',   { method:'POST', headers:{'Content-Type':'application/json'}, body }),
+    ]);
+    kpiData   = await resKpi.json();
+    mappaData = await resMappa.json();
+    ocvData   = await resOCV.json();
+
+    // ── Campione insufficiente: mostra pannello informativo ───────
+    if (kpiData.insufficient_data) {
+      showInsufficientData(kpiData.n_hcp, targets);
+      return;
+    }
+
+    if (kpiData.error)   { console.error('KPI:', kpiData.error); return; }
+    if (mappaData.error) { console.warn('Mappa:', mappaData.error); }
+    if (ocvData.error)   { console.warn('OCV:',   ocvData.error);  }
+
+    // Mostra risultati (nasconde empty/insufficient state, rivela tab bar)
+    showResults();
+    funnelRendered = false; // Reset: nuova analisi → funnel va ri-renderizzato
+    setKpiMode('efficacia'); // Reset toggle KPI alla modalità default
+    ocvMode = 'ocv';         // Reset toggle OCV alla modalità default
+
+    // Aggiorna HCP count badge + etichette filtri attivi
+    const badge = document.getElementById('hcp-count');
+    const filterParts = [];
+    if (targets.length)   filterParts.push(targets.join(', '));
+    if (aree.length)      filterParts.push(aree.join(', '));
+    if (patologie.length) filterParts.push(patologie.join(', '));
+    badge.textContent = kpiData.n_hcp + ' HCP' + (filterParts.length ? ' · ' + filterParts.join(' | ') : '');
+    badge.classList.remove('hidden');
+
+    // Summary
+    updateSummary(kpiData);
+
+    // Render grafici KPI
+    if (kpiData.penetrazione)  renderPenetrazione(kpiData.penetrazione);
+    if (kpiData.utilita)        renderUtilita(kpiData.utilita);
+    if (kpiData.ricordo)        renderRicordo(kpiData.ricordo);
+    if (kpiData.ingaggio)       renderIngaggio(kpiData.ingaggio);
+    if (kpiData.propensione)    renderPropensione(kpiData.propensione);
+    if (kpiData.nps)            renderNPS(kpiData.nps);
+    if (kpiData.utilita_fasce)  renderFasce(kpiData.utilita_fasce);
+
+    // Render mappe
+    if (mappaData.mappa && mappaData.mappa.length) renderMappe(mappaData.mappa);
+
+    // Render OCV
+    if (ocvData && !ocvData.error) renderOCV(ocvData);
+
+    // Aggiorna status — icona check verde, isOk=true (default)
+    const specParts = [];
+    if (targets.length)   specParts.push(targets.join(', '));
+    if (aree.length)      specParts.push(aree.join(', '));
+    if (patologie.length) specParts.push(patologie.join(', '));
+    const specLabel2 = specParts.length ? specParts.join(' | ') : 'Tutti gli HCP';
+    setLoadStatus(`${kpiData.n_hcp} HCP analizzati · ${specLabel2}`, true);
+
+    // Attiva tab KPI se non già attiva
+    if (!document.querySelector('.tab-btn.active')) {
+      document.querySelector('[data-tab="kpi"]').click();
+    }
+
+  } catch(err) {
+    alert('Errore connessione: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="play-circle" class="w-4 h-4"></i> Avvia Analisi';
+    lucide.createIcons();
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// FILTRO AREA TERAPEUTICA → aggiorna Patologie dinamicamente
+// ──────────────────────────────────────────────────────
+document.getElementById('sel-area').addEventListener('change', async function () {
+  const areeSelezionate = Array.from(this.selectedOptions).map(o => o.value);
+  const selPat   = document.getElementById('sel-patologia');
+  const badgeA   = document.getElementById('area-badge');
+  const badgeP   = document.getElementById('pat-badge');
+  const loading  = document.getElementById('pat-loading');
+
+  // Badge area attiva
+  badgeA.classList.toggle('hidden', areeSelezionate.length === 0);
+
+  if (areeSelezionate.length === 0) {
+    // Nessuna area selezionata → reset patologie
+    selPat.innerHTML = '<option disabled value="">— Seleziona prima un\'area —</option>';
+    badgeP.classList.add('hidden');
+    lucide.createIcons();
+    return;
+  }
+
+  // Spinner caricamento
+  loading.classList.remove('hidden');
+  lucide.createIcons();
+  selPat.innerHTML = '';
+
+  try {
+    // Recupera patologie per ogni area selezionata (in parallelo)
+    const fetches = areeSelezionate.map(a =>
+      fetch('/modulo1/api/aree?area=' + encodeURIComponent(a))
+        .then(r => r.json())
+        .then(d => d.patologie || [])
+    );
+    const lists = await Promise.all(fetches);
+
+    // Union deduplicate + sort
+    const allPat = [...new Set(lists.flat())].sort();
+
+    if (allPat.length === 0) {
+      selPat.innerHTML = '<option disabled value="">Nessuna patologia disponibile</option>';
+    } else {
+      allPat.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p;
+        opt.textContent = p;
+        selPat.appendChild(opt);
+      });
+    }
+  } catch (e) {
+    selPat.innerHTML = '<option disabled value="">Errore caricamento</option>';
+    console.error('Errore caricamento patologie:', e);
+  } finally {
+    loading.classList.add('hidden');
+    // Aggiorna badge patologie in base a selezione
+    const selCount = Array.from(selPat.selectedOptions).filter(o => !o.disabled).length;
+    badgeP.classList.toggle('hidden', selCount === 0);
+    lucide.createIcons();
+  }
+});
+
+// Badge patologia attiva al cambio selezione
+document.getElementById('sel-patologia').addEventListener('change', function () {
+  const selCount = Array.from(this.selectedOptions).filter(o => !o.disabled).length;
+  document.getElementById('pat-badge').classList.toggle('hidden', selCount === 0);
+});
+
+// ──────────────────────────────────────────────────────
+// EXPORT EXCEL — fetch + blob (robusto, con feedback utente)
+// ──────────────────────────────────────────────────────
+document.getElementById('btn-export').addEventListener('click', async () => {
+  const btn = document.getElementById('btn-export');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Preparazione...';
+  lucide.createIcons();
+
+  try {
+    const params = new URLSearchParams();
+    currentTargets.forEach(t => params.append('target', t));
+
+    const res = await fetch('/modulo1/export?' + params.toString());
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Errore server' }));
+      alert('Errore export: ' + (err.error || res.statusText));
+      return;
+    }
+
+    const blob = await res.blob();
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href     = url;
+    a.download = 'MCM_Comportamento.xlsx';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Errore download: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Scarica Excel';
+    lucide.createIcons();
+  }
+});
+
+// ──────────────────────────────────────────────────────
+// EXPORT PDF — fetch con error handling visibile
+// ──────────────────────────────────────────────────────
+document.getElementById('btn-export-pdf').addEventListener('click', async () => {
+  const btn    = document.getElementById('btn-export-pdf');
+  const status = document.getElementById('pdf-status');
+
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Generazione PDF&hellip;';
+  status.textContent = 'Calcolo KPI e grafici in corso, attendere (prima generazione ~15s)…';
+  status.className = 'text-xs text-white/50 mt-2';
+  lucide.createIcons();
+
+  const pdfBody = JSON.stringify({
+    target:           currentTargets,
+    area_terapeutica: currentAree,
+    patologie:        currentPatologie,
+  });
+
+  try {
+    const resp = await fetch('/modulo1/export/pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    pdfBody,
+    });
+    const ct = resp.headers.get('content-type') || '';
+
+    if (resp.ok && ct.includes('pdf')) {
+      // Successo: crea blob URL e avvia download
+      const blob    = await resp.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a       = document.createElement('a');
+      // Filename riflette i filtri attivi
+      const parts = [];
+      if (currentTargets.length)   parts.push(currentTargets.join('_').slice(0,40));
+      if (currentAree.length)      parts.push(currentAree.map(a=>a.replace(/\s+/g,'-')).join('_').slice(0,30));
+      if (currentPatologie.length) parts.push(`${currentPatologie.length}pat`);
+      const label = parts.length ? parts.join('_') : 'tutti';
+      a.href     = blobUrl;
+      a.download = `MCM_Report_Comportamento_${label}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 8000);
+      status.textContent = 'Download avviato!';
+      status.className = 'text-xs text-teal-400 mt-2';
+    } else {
+      // Errore server: mostra messaggio
+      let errMsg = `Errore ${resp.status}`;
+      try { const data = await resp.json(); errMsg = data.error || errMsg; } catch {}
+      status.textContent = 'Errore generazione PDF: ' + errMsg;
+      status.className = 'text-xs text-red-400 mt-2';
+    }
+  } catch (err) {
+    status.textContent = 'Errore di rete: ' + err.message;
+    status.className = 'text-xs text-red-400 mt-2';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="file-text" class="w-4 h-4"></i> Scarica Report PDF';
+    lucide.createIcons();
+  }
+});
+
+// ──────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs('tab-container');
+  lucide.createIcons();
+  // Imposta hint iniziale modalità efficacia
+  setKpiMode('efficacia');
+
+  document.getElementById('btn-load').addEventListener('click', loadAll);
+
+  // ── Lazy load Funnel HCP al click sul tab ─────────────────────────
+  // initTabs è già in cima → tab panel visibile prima che questo handler scatti
+  document.querySelector('[data-tab="funnel"]').addEventListener('click', () => {
+    if (kpiData && !kpiData.error && !kpiData.insufficient_data) {
+      // Piccolo delay per garantire che il panel sia già visibile (Plotly misura il DOM)
+      setTimeout(renderFunnel, 0);
+    }
+  });
+});
+</script>
+
+<style>
+/* ── Toggle Efficacia / Impatto ─────────────────────── */
+.kpi-mode-btn {
+  color: rgba(255,255,255,0.35);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+.kpi-mode-btn:hover {
+  color: rgba(255,255,255,0.65);
+  background: rgba(255,255,255,0.05);
+}
+.kpi-mode-btn.active {
+  color: #00A896;
+  background: rgba(0,168,150,0.15);
+}
+</style>
+{% endblock %}

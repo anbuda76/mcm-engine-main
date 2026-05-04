@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Errore del server{% endblock %}
+{% block page_title %}Errore 500{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+
+  <!-- Icona grande -->
+  <div class="w-20 h-20 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center mb-6 shadow-glow-card">
+    <i data-lucide="server-crash" class="w-10 h-10 text-warning/50"></i>
+  </div>
+
+  <!-- Codice errore -->
+  <div class="text-7xl font-bold text-white/5 leading-none mb-3 select-none">500</div>
+
+  <!-- Titolo -->
+  <h1 class="text-xl font-semibold text-white/70 mb-2">Errore interno del server</h1>
+  <p class="text-sm text-white/35 max-w-sm mb-8">
+    Si è verificato un errore inatteso. Riprova o torna alla dashboard.
+    Se il problema persiste, controlla i log del server Flask.
+  </p>
+
+  <!-- Azioni -->
+  <div class="flex items-center gap-3">
+    <a href="{{ url_for('dashboard.index') }}"
+      class="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent/80 text-white font-medium rounded-xl transition-all text-sm shadow-lg shadow-accent/20">
+      <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+      Dashboard
+    </a>
+    <button onclick="location.reload()"
+      class="flex items-center gap-2 px-5 py-2.5 bg-white/6 hover:bg-white/10 text-white/60 hover:text-white font-medium rounded-xl transition-all text-sm border border-white/10">
+      <i data-lucide="refresh-cw" class="w-4 h-4"></i>
+      Riprova
+    </button>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

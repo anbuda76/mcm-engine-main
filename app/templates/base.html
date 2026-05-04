@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="it" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{% block title %}MCM Engine{% endblock %} — BHAVE</title>
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            primary:   '#1E2761',
+            secondary: '#028090',
+            accent:    '#00A896',
+            success:   '#02C39A',
+            warning:   '#F77F00',
+            danger:    '#e53e3e',
+            // Dark surface palette
+            surface: {
+              900: '#0d1117',
+              800: '#161b27',
+              700: '#1c2333',
+              600: '#21293d',
+              500: '#2a3550',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+          },
+          boxShadow: {
+            'glow-accent': '0 0 20px rgba(0,168,150,0.15)',
+            'glow-card':   '0 4px 24px rgba(0,0,0,0.4)',
+            'inner-dark':  'inset 0 1px 0 rgba(255,255,255,0.05)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Inter font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+  <!-- Lucide Icons -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+
+  <!-- Custom CSS -->
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}" />
+
+  {% block head %}{% endblock %}
+</head>
+
+<body class="bg-surface-900 text-slate-200 flex h-screen overflow-hidden font-sans antialiased">
+
+  <!-- ═══════════════════════════════════════════════════════════
+       SIDEBAR
+  ════════════════════════════════════════════════════════════ -->
+  <aside id="sidebar"
+    class="w-60 bg-surface-800 flex flex-col flex-shrink-0 h-full border-r border-white/5 overflow-hidden transition-all duration-300 ease-in-out">
+
+    <!-- ── Brand ── -->
+    <div class="flex items-center gap-3 px-4 py-5 border-b border-white/5 flex-shrink-0">
+      <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-accent to-secondary flex items-center justify-center shadow-glow-accent flex-shrink-0">
+        <i data-lucide="brain-circuit" class="w-4 h-4 text-white"></i>
+      </div>
+      <div class="overflow-hidden">
+        <div class="text-white font-semibold text-sm leading-tight tracking-tight whitespace-nowrap">MCM Engine</div>
+        <div class="text-white/35 text-[10px] tracking-widest uppercase whitespace-nowrap">BHAVE Platform</div>
+      </div>
+    </div>
+
+    <!-- ── Nav label ── -->
+    <div class="px-4 pt-5 pb-1">
+      <span class="text-[10px] font-semibold tracking-widest text-white/25 uppercase">Moduli</span>
+    </div>
+
+    <!-- ── Navigation ── -->
+    <nav class="flex-1 px-3 py-1 space-y-0.5 overflow-y-auto">
+
+      <!-- Dashboard -->
+      <a href="{{ url_for('dashboard.index') }}" id="nav-dashboard"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'dashboard' %}bg-accent/15 text-accent border border-accent/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'dashboard' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="layout-dashboard" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">Dashboard</span>
+      </a>
+
+      <!-- Comportamento -->
+      {% if 'comportamento' in user_modules %}
+      <a href="{{ url_for('modulo1.index') }}" id="nav-modulo1"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'modulo1' %}bg-accent/15 text-accent border border-accent/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'modulo1' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="users-round" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">Comportamento</span>
+      </a>
+      {% endif %}
+
+      <!-- Performance -->
+      {% if 'performance' in user_modules %}
+      <a href="{{ url_for('modulo2.index') }}" id="nav-modulo2"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'modulo2' %}bg-accent/15 text-accent border border-accent/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'modulo2' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="bar-chart-3" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">Performance</span>
+      </a>
+      {% endif %}
+
+      <!-- Trend -->
+      {% if 'trend' in user_modules %}
+      <a href="{{ url_for('trend.index') }}" id="nav-trend"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'trend' %}bg-accent/15 text-accent border border-accent/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'trend' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="trending-up" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">Trend</span>
+      </a>
+      {% endif %}
+
+      <!-- AI Assistant -->
+      <a href="{{ url_for('ai.index') }}" id="nav-ai"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'ai' %}bg-accent/15 text-accent border border-accent/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'ai' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-accent rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="bot" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">AI Agent</span>
+        <span class="ml-auto text-[9px] bg-accent/20 text-accent/80 px-1.5 py-0.5 rounded-full font-semibold">Nuovo</span>
+      </a>
+
+      <!-- Divider -->
+      <div class="pt-3 pb-1 px-1">
+        <span class="text-[10px] font-semibold tracking-widest text-white/25 uppercase">Sistema</span>
+      </div>
+
+      <!-- Admin Panel (solo admin) -->
+      {% if current_user_is_admin %}
+      <a href="{{ url_for('admin.index') }}" id="nav-admin"
+        class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 relative
+               {% if active_page == 'admin' %}bg-warning/15 text-warning border border-warning/20{% else %}text-white/50 hover:text-white hover:bg-white/6 border border-transparent{% endif %}">
+        {% if active_page == 'admin' %}
+          <span class="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-warning rounded-r-full"></span>
+        {% endif %}
+        <i data-lucide="shield" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:scale-110"></i>
+        <span class="whitespace-nowrap">Pannello Admin</span>
+      </a>
+      {% endif %}
+
+      <!-- Impostazioni (futuro) -->
+      <a href="#" class="nav-item group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-white/30 hover:text-white/60 hover:bg-white/4 border border-transparent cursor-not-allowed">
+        <i data-lucide="settings-2" class="w-4 h-4 flex-shrink-0 transition-transform group-hover:rotate-45"></i>
+        <span class="whitespace-nowrap">Impostazioni</span>
+        <span class="ml-auto text-[9px] bg-white/10 text-white/30 px-1.5 py-0.5 rounded-full">presto</span>
+      </a>
+
+    </nav>
+
+    <!-- ── Footer sidebar ── -->
+    <div class="px-4 py-4 border-t border-white/5 flex-shrink-0">
+      <div class="flex items-center gap-2">
+        <div class="w-1.5 h-1.5 bg-success rounded-full animate-pulse"></div>
+        <span class="text-white/30 text-[10px] tracking-wide">v2.0 Flask Edition</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ═══════════════════════════════════════════════════════════
+       MAIN CONTENT
+  ════════════════════════════════════════════════════════════ -->
+  <div class="flex-1 flex flex-col overflow-hidden">
+
+    <!-- ── Top bar ── -->
+    <header class="bg-surface-800 border-b border-white/5 px-5 py-3 flex items-center justify-between flex-shrink-0 shadow-inner-dark">
+      <div class="flex items-center gap-3">
+        <!-- Toggle sidebar -->
+        <button onclick="toggleSidebar()" title="Toggle sidebar"
+          class="p-1.5 rounded-lg text-white/40 hover:text-white hover:bg-white/8 transition-all duration-150 group">
+          <i data-lucide="panel-left" class="w-4 h-4 transition-transform group-hover:scale-110"></i>
+        </button>
+
+        <!-- Breadcrumb -->
+        <div class="flex items-center gap-1.5 text-sm">
+          <span class="text-white/30">BHAVE</span>
+          <i data-lucide="chevron-right" class="w-3 h-3 text-white/20"></i>
+          <span class="text-white/80 font-medium">{% block page_title %}MCM Engine{% endblock %}</span>
+        </div>
+      </div>
+
+      <!-- Right side topbar -->
+      <div class="flex items-center gap-2">
+        {% if current_user_is_admin %}
+        <a href="{{ url_for('admin.index') }}"
+           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-warning/70 hover:text-warning hover:bg-warning/10 transition-all">
+          <i data-lucide="shield" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Admin</span>
+        </a>
+        <div class="w-px h-4 bg-white/10"></div>
+        {% endif %}
+        <div class="flex items-center gap-2">
+          <div class="w-6 h-6 rounded-full bg-accent/20 border border-accent/30 flex items-center justify-center flex-shrink-0">
+            <i data-lucide="user" class="w-3 h-3 text-accent"></i>
+          </div>
+          <span class="hidden sm:inline text-[11px] text-white/50">{{ current_user.username }}</span>
+        </div>
+        <div class="w-px h-4 bg-white/10"></div>
+        <a href="{{ url_for('auth.logout') }}"
+           class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-medium text-white/40 hover:text-white/70 hover:bg-white/6 transition-all"
+           title="Esci">
+          <i data-lucide="log-out" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Esci</span>
+        </a>
+      </div>
+    </header>
+
+    <!-- ── Content area ── -->
+    <main class="flex-1 overflow-y-auto p-5 space-y-5">
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+
+  <!-- ── Scripts ── -->
+  <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+  <script>
+    // Inizializza tutte le icone Lucide
+    lucide.createIcons();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

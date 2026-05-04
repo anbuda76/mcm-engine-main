@@ -1,0 +1,225 @@
+{% extends "base.html" %}
+{% block title %}{{ action_label }} — Admin{% endblock %}
+{% block page_title %}{{ action_label }}{% endblock %}
+
+{% block content %}
+<div class="max-w-2xl space-y-4">
+
+  <!-- Back -->
+  <a href="{{ url_for('admin.index') }}"
+    class="inline-flex items-center gap-1.5 text-xs text-white/40 hover:text-white/70 transition-colors mb-1">
+    <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+    Torna alla lista utenti
+  </a>
+
+  <div class="kpi-card space-y-5">
+
+    <!-- Titolo -->
+    <div class="flex items-center gap-3 pb-3 border-b border-white/5">
+      <div class="w-9 h-9 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center">
+        <i data-lucide="{{ 'pencil' if user else 'user-plus' }}" class="w-4 h-4 text-accent"></i>
+      </div>
+      <div>
+        <div class="text-white font-semibold text-sm">{{ action_label }}</div>
+        <div class="text-white/40 text-xs">{{ user.username if user else 'Nuovo account utente' }}</div>
+      </div>
+    </div>
+
+    {% if error %}
+    <div class="flex items-center gap-2.5 text-xs text-danger/80 bg-danger/10 border border-danger/20 rounded-lg px-3 py-2.5">
+      <i data-lucide="alert-circle" class="w-4 h-4 flex-shrink-0"></i>
+      <span>{{ error }}</span>
+    </div>
+    {% endif %}
+
+    <form method="POST" class="space-y-5">
+
+      <!-- Username + Password -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="space-y-1.5">
+          <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+            Username <span class="text-accent">*</span>
+          </label>
+          <input type="text" name="username" required
+            value="{{ user.username if user else '' }}"
+            class="dark-input w-full"
+            placeholder="es. mario.rossi">
+        </div>
+        <div class="space-y-1.5">
+          <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+            Password {{ '' if user else '*' }}
+          </label>
+          <input type="password" name="password" {{ 'required' if not user else '' }}
+            class="dark-input w-full"
+            placeholder="{{ 'Lascia vuoto per non cambiare' if user else 'Minimo 6 caratteri' }}">
+          {% if user %}
+          <p class="text-white/25 text-[10px]">Lascia vuoto per mantenere la password attuale.</p>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Ruolo Admin -->
+      <div class="flex items-center gap-3 p-3 bg-warning/5 border border-warning/15 rounded-xl">
+        <input type="checkbox" name="is_admin" value="1" id="chk-admin"
+          {{ 'checked' if user and user.is_admin else '' }}
+          class="w-4 h-4 rounded accent-warning cursor-pointer">
+        <label for="chk-admin" class="cursor-pointer">
+          <div class="text-white/80 text-sm font-medium">Amministratore</div>
+          <div class="text-white/35 text-xs">Bypassa tutti i permessi — accede a tutti i moduli e dati.</div>
+        </label>
+      </div>
+
+      <!-- Moduli -->
+      <div class="space-y-2">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+          Moduli abilitati
+        </label>
+        <div class="grid grid-cols-3 gap-3">
+          {% set module_icons = {'comportamento': 'users-round', 'performance': 'bar-chart-3', 'trend': 'trending-up'} %}
+          {% set module_labels = {'comportamento': 'Comportamento', 'performance': 'Performance', 'trend': 'Trend'} %}
+          {% for m in all_modules %}
+          <label class="flex items-center gap-2.5 p-3 rounded-xl border cursor-pointer transition-all
+                         {{ 'border-accent/30 bg-accent/8' if (user and m in user.modules) or not user else 'border-white/8 bg-white/3 hover:border-accent/20' }}"
+            id="lbl-mod-{{ m }}">
+            <input type="checkbox" name="modules" value="{{ m }}"
+              {{ 'checked' if (user and m in user.modules) or not user else '' }}
+              class="w-4 h-4 rounded accent-accent cursor-pointer"
+              onchange="updateModuleLabel('{{ m }}', this.checked)">
+            <i data-lucide="{{ module_icons[m] }}" class="w-4 h-4 text-accent/70 flex-shrink-0"></i>
+            <span class="text-white/75 text-sm font-medium">{{ module_labels[m] }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Agenti AI -->
+      <div class="space-y-2">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+          Agenti AI abilitati
+        </label>
+        <div class="grid grid-cols-2 gap-3">
+          {% set agent_icons  = {'comportamento': 'users-round', 'performance': 'bar-chart-3'} %}
+          {% set agent_colors = {'comportamento': 'accent',      'performance': 'secondary'} %}
+          {% for a in all_agents %}
+          {% set adef = agent_defs.get(a, {}) %}
+          <label class="flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all
+                         {{ 'border-accent/30 bg-accent/8' if (user and a in user.agents) or (not user) else 'border-white/8 bg-white/3 hover:border-accent/20' }}"
+            id="lbl-ag-{{ a }}">
+            <input type="checkbox" name="agents" value="{{ a }}"
+              {{ 'checked' if (user and a in user.agents) or (not user) else '' }}
+              class="w-4 h-4 rounded accent-accent cursor-pointer mt-0.5 flex-shrink-0">
+            <div>
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="{{ agent_icons.get(a, 'bot') }}" class="w-3.5 h-3.5 text-accent/70 flex-shrink-0"></i>
+                <span class="text-white/75 text-sm font-medium">{{ adef.get('label', a) }}</span>
+              </div>
+              <span class="text-white/35 text-[10px]">{{ adef.get('description', '') }}</span>
+            </div>
+          </label>
+          {% endfor %}
+        </div>
+        <p class="text-[10px] text-white/25">Lascia entrambi selezionati per accesso completo agli agenti.</p>
+      </div>
+
+      <!-- Target medici -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+            Target Medici (Specializzazioni)
+          </label>
+          <span class="text-[10px] text-white/25">Lascia vuoto = accesso a tutti</span>
+        </div>
+        {% if all_targets %}
+        <div class="max-h-44 overflow-y-auto space-y-1 p-3 bg-white/2 border border-white/6 rounded-xl">
+          {% for t in all_targets %}
+          <label class="flex items-center gap-2.5 py-1 cursor-pointer group">
+            <input type="checkbox" name="targets" value="{{ t }}"
+              {{ 'checked' if user and t in user.targets else '' }}
+              class="w-3.5 h-3.5 rounded accent-accent cursor-pointer flex-shrink-0">
+            <span class="text-white/65 text-xs group-hover:text-white/85 transition-colors">{{ t }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="toggleAll('targets', true)"
+            class="text-[10px] text-accent/60 hover:text-accent underline underline-offset-2">Seleziona tutti</button>
+          <span class="text-white/20">·</span>
+          <button type="button" onclick="toggleAll('targets', false)"
+            class="text-[10px] text-accent/60 hover:text-accent underline underline-offset-2">Deseleziona tutti</button>
+        </div>
+        {% else %}
+        <p class="text-white/30 text-xs italic">Nessuna specializzazione disponibile (dati non caricati).</p>
+        {% endif %}
+      </div>
+
+      <!-- Aziende -->
+      <div class="space-y-2">
+        <div class="flex items-center justify-between">
+          <label class="text-[11px] text-white/40 uppercase tracking-wider font-medium">
+            Aziende (Performance &amp; Trend)
+          </label>
+          <span class="text-[10px] text-white/25">Lascia vuoto = accesso a tutte</span>
+        </div>
+        {% if all_aziende %}
+        <div class="max-h-44 overflow-y-auto space-y-1 p-3 bg-white/2 border border-white/6 rounded-xl">
+          {% for az in all_aziende %}
+          <label class="flex items-center gap-2.5 py-1 cursor-pointer group">
+            <input type="checkbox" name="aziende" value="{{ az }}"
+              {{ 'checked' if user and az in user.aziende else '' }}
+              class="w-3.5 h-3.5 rounded accent-accent cursor-pointer flex-shrink-0">
+            <span class="text-white/65 text-xs group-hover:text-white/85 transition-colors">{{ az }}</span>
+          </label>
+          {% endfor %}
+        </div>
+        <div class="flex gap-2">
+          <button type="button" onclick="toggleAll('aziende', true)"
+            class="text-[10px] text-accent/60 hover:text-accent underline underline-offset-2">Seleziona tutte</button>
+          <span class="text-white/20">·</span>
+          <button type="button" onclick="toggleAll('aziende', false)"
+            class="text-[10px] text-accent/60 hover:text-accent underline underline-offset-2">Deseleziona tutte</button>
+        </div>
+        {% else %}
+        <p class="text-white/30 text-xs italic">Nessuna azienda disponibile (dati non caricati).</p>
+        {% endif %}
+      </div>
+
+      <!-- Azioni -->
+      <div class="flex items-center gap-3 pt-3 border-t border-white/5">
+        <button type="submit"
+          class="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent/85
+                 text-white font-semibold text-sm rounded-xl transition-all shadow-lg shadow-accent/20">
+          <i data-lucide="save" class="w-4 h-4"></i>
+          {{ action_label }}
+        </button>
+        <a href="{{ url_for('admin.index') }}"
+          class="px-5 py-2.5 text-white/50 hover:text-white/80 text-sm font-medium transition-colors">
+          Annulla
+        </a>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function toggleAll(name, checked) {
+  document.querySelectorAll(`input[name="${name}"]`)
+    .forEach(cb => cb.checked = checked);
+}
+
+function updateModuleLabel(mod, checked) {
+  const lbl = document.getElementById('lbl-mod-' + mod);
+  if (checked) {
+    lbl.classList.add('border-accent/30', 'bg-accent/8');
+    lbl.classList.remove('border-white/8', 'bg-white/3');
+  } else {
+    lbl.classList.remove('border-accent/30', 'bg-accent/8');
+    lbl.classList.add('border-white/8', 'bg-white/3');
+  }
+}
+
+document.addEventListener('DOMContentLoaded', () => { lucide.createIcons(); });
+</script>
+{% endblock %}

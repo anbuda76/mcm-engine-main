@@ -1,0 +1,985 @@
+{% extends "base.html" %}
+{% block title %}AI Agent{% endblock %}
+{% block page_title %}AI Agent{% endblock %}
+
+{% block head %}
+<style>
+/* ── Layout generale ──────────────────────────────────────── */
+#agent-selector, #chat-area { transition: opacity .2s ease; }
+
+/* ── Agent card ──────────────────────────────────────────── */
+.agent-card {
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 20px; border-radius: 16px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,0.07);
+  background: rgba(255,255,255,0.03);
+  transition: all .2s ease;
+}
+.agent-card:hover {
+  border-color: rgba(0,168,150,0.35);
+  background: rgba(0,168,150,0.06);
+  transform: translateY(-2px);
+}
+.agent-card.perf:hover {
+  border-color: rgba(124,58,237,0.35);
+  background: rgba(124,58,237,0.06);
+}
+.agent-card-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.agent-starter {
+  font-size: 11px; color: rgba(255,255,255,0.35);
+  padding: 6px 10px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 8px;
+  cursor: pointer; transition: all .15s;
+  display: block; width: 100%;
+  text-align: left;
+}
+.agent-starter:hover { background: rgba(255,255,255,0.06); color: rgba(255,255,255,.6); }
+
+/* ── Chat scrollable area ─────────────────────────────────── */
+#chat-messages {
+  max-height: calc(100vh - 360px);
+  min-height: 260px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+}
+#chat-messages::-webkit-scrollbar { width: 4px; }
+#chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius:2px; }
+
+/* ── Bubble utente ────────────────────────────────────────── */
+.bubble-user {
+  background: rgba(0,168,150,0.12);
+  border: 1px solid rgba(0,168,150,0.2);
+  border-radius: 18px 18px 4px 18px;
+  padding: 10px 14px;
+  max-width: 80%;
+  margin-left: auto;
+  font-size: 13px; line-height: 1.5;
+  color: rgba(255,255,255,0.88);
+}
+
+/* ── Bubble bot ───────────────────────────────────────────── */
+.bubble-bot-inner {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 4px 18px 18px 18px;
+  padding: 12px 14px;
+  font-size: 13px; line-height: 1.6;
+  color: rgba(255,255,255,0.82);
+}
+
+/* ── Step cards (think / tool / observation) ─────────────── */
+.step-card {
+  border-radius: 10px; overflow: hidden;
+  margin: 4px 0;
+  font-size: 11px;
+}
+/* Think */
+.step-think   { border: 1px solid rgba(247,127,0,0.18); background: rgba(247,127,0,0.05); }
+/* Tool call */
+.step-tool    { border: 1px solid rgba(96,165,250,0.18); background: rgba(96,165,250,0.04); }
+/* Observation */
+.step-obs     { border: 1px solid rgba(2,195,154,0.18);  background: rgba(2,195,154,0.04); }
+
+.step-toggle {
+  display: flex; align-items: center; gap: 6px;
+  width: 100%; padding: 7px 10px; text-align: left;
+  border: none; background: none; cursor: pointer;
+  font-size: 10px; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; transition: opacity .15s;
+}
+.step-toggle:hover { opacity: .8; }
+.step-toggle .chev { transition: transform .2s; flex-shrink: 0; }
+.step-toggle.open .chev { transform: rotate(90deg); }
+
+.step-body {
+  display: none; padding: 6px 10px 10px;
+  border-top: 1px solid rgba(255,255,255,0.05);
+  color: rgba(255,255,255,0.4);
+  white-space: pre-wrap; line-height: 1.6;
+  max-height: 220px; overflow-y: auto;
+}
+.step-body.visible { display: block; }
+
+/* Tool call inline (non collassabile) */
+.tool-inline {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 10px;
+  font-size: 11px; color: rgba(96,165,250,0.85);
+  font-family: monospace;
+}
+
+/* ── Typing indicator ─────────────────────────────────────── */
+.typing-dot {
+  display: inline-block; width: 5px; height: 5px; border-radius: 50%;
+  background: rgba(0,168,150,.7);
+  animation: bounce 1.2s infinite; margin: 0 1px;
+}
+.typing-dot:nth-child(2) { animation-delay: .2s; }
+.typing-dot:nth-child(3) { animation-delay: .4s; }
+@keyframes bounce {
+  0%,60%,100% { transform:translateY(0); opacity:.5; }
+  30%          { transform:translateY(-5px); opacity:1; }
+}
+
+/* ── Notice ───────────────────────────────────────────────── */
+.ai-notice {
+  display: none; align-items: flex-start; gap: 8px;
+  padding: 8px 12px; border-radius: 8px;
+  font-size: 11px; line-height: 1.5; margin-top: 8px;
+}
+.ai-notice.visible { display: flex; }
+.ai-notice.warn  { background:rgba(247,127,0,.08); border:1px solid rgba(247,127,0,.2); color:rgba(247,127,0,.9); }
+.ai-notice.danger{ background:rgba(229,62,62,.08);  border:1px solid rgba(229,62,62,.2);  color:rgba(229,62,62,.9); }
+
+/* ── Chat input ───────────────────────────────────────────── */
+#chat-input {
+  resize: none; min-height: 44px; max-height: 110px; overflow-y: auto;
+  color: rgba(255,255,255,.88) !important;
+  background-color: rgba(255,255,255,.04) !important;
+  caret-color: #00A896; scrollbar-width: thin;
+}
+#chat-input::placeholder { color: rgba(255,255,255,.25); }
+#chat-input:focus { outline: none; box-shadow: 0 0 0 2px rgba(0,168,150,.3); }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="space-y-4 max-w-3xl mx-auto">
+
+  <!-- ── Header ───────────────────────────────────────────── -->
+  <div class="kpi-card">
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-xl bg-accent/15 border border-accent/20 flex items-center justify-center flex-shrink-0">
+        <i data-lucide="bot" class="w-5 h-5 text-accent"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-semibold text-sm">AI Agent — MCM Engine</div>
+        <div class="text-white/35 text-xs">Agenti specializzati con Reasoning · Ollama locale · Tool calling</div>
+      </div>
+      <div id="ollama-status" class="flex items-center gap-1.5 text-[11px] text-white/30 flex-shrink-0">
+        <div class="w-1.5 h-1.5 rounded-full bg-white/20"></div>
+        <span>Verifica...</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STATO 1 — Selettore agenti                           -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="agent-selector">
+
+    <div class="section-title mb-3">
+      <i data-lucide="layout-grid" class="w-3 h-3"></i>
+      Con quale esperto vuoi parlare?
+    </div>
+
+    <!-- Cards agenti (popolate da JS) -->
+    <div id="agent-cards" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <!-- Skeleton loading -->
+      <div class="agent-card animate-pulse">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-white/5"></div>
+          <div class="space-y-1.5 flex-1">
+            <div class="h-3 bg-white/5 rounded w-2/3"></div>
+            <div class="h-2 bg-white/5 rounded w-full"></div>
+          </div>
+        </div>
+      </div>
+      <div class="agent-card animate-pulse">
+        <div class="flex items-center gap-3">
+          <div class="w-11 h-11 rounded-xl bg-white/5"></div>
+          <div class="space-y-1.5 flex-1">
+            <div class="h-3 bg-white/5 rounded w-2/3"></div>
+            <div class="h-2 bg-white/5 rounded w-full"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Info box reasoning -->
+    <div class="kpi-card mt-4">
+      <div class="chart-title mb-3">
+        <i data-lucide="brain" class="w-3.5 h-3.5 text-warning"></i>
+        Come funziona
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
+          <i data-lucide="git-branch" class="w-4 h-4 text-warning flex-shrink-0 mt-0.5"></i>
+          <div>
+            <div class="text-xs font-medium text-white/70">Reasoning + Tool calling</div>
+            <div class="text-[11px] text-white/35 mt-0.5">L'agente pensa, chiama i dati che gli servono, poi risponde</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
+          <i data-lucide="shield-check" class="w-4 h-4 text-accent flex-shrink-0 mt-0.5"></i>
+          <div>
+            <div class="text-xs font-medium text-white/70">Privacy totale</div>
+            <div class="text-[11px] text-white/35 mt-0.5">Tutto locale via Ollama. I dati HCP non escono mai dal PC</div>
+          </div>
+        </div>
+        <div class="flex items-start gap-3 p-3 bg-white/3 rounded-lg border border-white/5">
+          <i data-lucide="zap" class="w-4 h-4 text-success flex-shrink-0 mt-0.5"></i>
+          <div>
+            <div class="text-xs font-medium text-white/70">Dati sempre aggiornati</div>
+            <div class="text-[11px] text-white/35 mt-0.5">L'agente legge i KPI dalla cache live, non da dati statici</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /agent-selector -->
+
+
+  <!-- ══════════════════════════════════════════════════════ -->
+  <!-- STATO 2 — Chat attiva con agente selezionato         -->
+  <!-- ══════════════════════════════════════════════════════ -->
+  <div id="chat-area" style="display:none" class="space-y-3">
+
+    <!-- Agent header bar -->
+    <div id="agent-header" class="kpi-card">
+      <div class="flex items-center gap-3">
+        <!-- Back -->
+        <button id="btn-back"
+          class="flex items-center gap-1.5 text-[11px] text-white/40 hover:text-white/70 transition-colors flex-shrink-0">
+          <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Cambia agente</span>
+        </button>
+        <div class="w-px h-5 bg-white/8 flex-shrink-0"></div>
+
+        <!-- Agent identity (filled by JS) -->
+        <div id="agent-identity" class="flex items-center gap-2.5 flex-1 min-w-0">
+          <div id="hdr-icon" class="w-8 h-8 rounded-lg bg-accent/15 border border-accent/20 flex items-center justify-center flex-shrink-0">
+            <i id="hdr-lucide" data-lucide="bot" class="w-4 h-4 text-accent"></i>
+          </div>
+          <div class="min-w-0">
+            <div id="hdr-label" class="text-white font-semibold text-sm truncate">—</div>
+            <div id="hdr-desc"  class="text-white/35 text-[11px] truncate">—</div>
+          </div>
+        </div>
+
+        <!-- Clear chat -->
+        <button id="btn-clear"
+          class="text-[10px] text-white/25 hover:text-white/50 transition-colors flex-shrink-0">
+          Pulisci chat
+        </button>
+      </div>
+    </div>
+
+    <!-- Messaggi -->
+    <div class="kpi-card flex flex-col gap-0">
+      <div id="chat-messages" class="flex flex-col gap-3 mb-4 pr-1">
+        <!-- Messaggio benvenuto (inserito da JS con identità agente) -->
+      </div>
+
+      <!-- Divider + input -->
+      <div class="border-t border-white/5 pt-4">
+
+        <!-- Notice: Ollama offline -->
+        <div id="notice-offline" class="ai-notice warn">
+          <i data-lucide="wifi-off" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
+          <span>Ollama non raggiungibile. Avvia con:
+            <code class="bg-white/10 px-1 rounded">ollama serve</code>
+            poi installa un modello:
+            <code class="bg-white/10 px-1 rounded">ollama pull qwen3:8b</code>
+          </span>
+        </div>
+        <div id="notice-model" class="ai-notice danger">
+          <i data-lucide="package-x" class="w-3.5 h-3.5 flex-shrink-0 mt-0.5"></i>
+          <span id="notice-model-text">Modello non trovato.</span>
+        </div>
+
+        <!-- Input area -->
+        <div class="flex items-end gap-2 mt-2">
+          <div class="flex-1">
+            <textarea id="chat-input" rows="1"
+              placeholder="Fai una domanda all'agente..."
+              class="w-full bg-white/4 border border-white/10 rounded-xl px-4 py-3 text-sm
+                     focus:border-accent/40 focus:bg-white/6 transition-all duration-150"></textarea>
+          </div>
+          <button id="btn-send"
+            class="flex items-center gap-2 px-4 py-3 bg-accent hover:bg-accent/80 text-white
+                   font-medium rounded-xl text-sm transition-colors border border-accent/30 flex-shrink-0">
+            <i data-lucide="send" class="w-4 h-4"></i>
+          </button>
+        </div>
+
+        <div class="flex items-center justify-between mt-2">
+          <p class="text-[10px] text-white/20">
+            Elaborazione locale via Ollama · I dati non lasciano il PC
+          </p>
+          <p id="step-counter" class="text-[10px] text-white/20"></p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /chat-area -->
+
+</div>
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+'use strict';
+
+// ─── Stato globale ──────────────────────────────────────────
+let currentAgent  = null;   // {key, label, description, icon, color, model, starter_questions}
+let chatHistory   = [];     // [{role, content}]
+let isGenerating  = false;
+
+// ── Stato streaming live ─────────────────────────────────────
+let liveThinkCard = null;   // card think aperta in live streaming
+let liveThinkBody = null;   // .step-body della think card live
+let liveThinkText = '';     // testo thinking accumulato
+let liveAnswerEl  = null;   // bubble risposta in live streaming
+let liveAnswerText = '';    // testo risposta accumulato
+
+// ─── DOM refs ───────────────────────────────────────────────
+const agentSelector = document.getElementById('agent-selector');
+const chatArea      = document.getElementById('chat-area');
+const chatMessages  = document.getElementById('chat-messages');
+const chatInput     = document.getElementById('chat-input');
+const btnSend       = document.getElementById('btn-send');
+const btnBack       = document.getElementById('btn-back');
+const btnClear      = document.getElementById('btn-clear');
+const stepCounter   = document.getElementById('step-counter');
+const ollamaStatus  = document.getElementById('ollama-status');
+
+// ─── Colori per agente ──────────────────────────────────────
+const COLORS = {
+  accent:    '#00A896',
+  secondary: '#7C3AED',
+  warning:   '#F77F00',
+  success:   '#02C39A',
+  blue:      '#60a5fa',
+};
+
+// ─── Utility ────────────────────────────────────────────────
+function esc(t) {
+  return String(t)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/\n/g,'<br>');
+}
+function scrollChat() { chatMessages.scrollTop = chatMessages.scrollHeight; }
+
+function colorForAgent(a) {
+  return a?.color === 'secondary' ? COLORS.secondary : COLORS.accent;
+}
+
+// ─── Carica agenti disponibili ──────────────────────────────
+async function loadAgents() {
+  try {
+    const res  = await fetch('/ai/api/agents');
+    const data = await res.json();
+    renderAgentCards(data.agents || []);
+  } catch (e) {
+    document.getElementById('agent-cards').innerHTML =
+      `<div class="kpi-card col-span-2 text-center text-white/30 text-sm py-8">
+        <i data-lucide="alert-triangle" class="w-5 h-5 mx-auto mb-2 text-warning/50"></i>
+        Impossibile caricare gli agenti. Ricarica la pagina.
+      </div>`;
+    lucide.createIcons({ nodes: [document.getElementById('agent-cards')] });
+  }
+}
+
+// ─── Render card agenti ─────────────────────────────────────
+function renderAgentCards(agents) {
+  const grid = document.getElementById('agent-cards');
+  if (!agents.length) {
+    grid.innerHTML = `<div class="kpi-card col-span-2 text-center text-white/30 text-sm py-8">
+      Nessun agente abilitato per il tuo account. Contatta l'amministratore.
+    </div>`;
+    lucide.createIcons({ nodes: [grid] });
+    return;
+  }
+
+  const isPerfCard = a => a.color === 'secondary';
+
+  grid.innerHTML = agents.map(a => {
+    const hoverCls = isPerfCard(a) ? 'perf' : '';
+    const iconColor = colorForAgent(a);
+    const bgAlpha  = isPerfCard(a) ? 'rgba(124,58,237,0.12)' : 'rgba(0,168,150,0.12)';
+    const bdAlpha  = isPerfCard(a) ? 'rgba(124,58,237,0.2)'  : 'rgba(0,168,150,0.2)';
+
+    const starters = (a.starter_questions || []).map(q =>
+      `<button class="agent-starter" onclick="startChatWith(event,'${a.key}',this)">${esc(q)}</button>`
+    ).join('');
+
+    return `
+      <div class="agent-card ${hoverCls}" onclick="selectAgent('${a.key}')">
+        <div class="flex items-start gap-3">
+          <div class="agent-card-icon" style="background:${bgAlpha};border:1px solid ${bdAlpha}">
+            <i data-lucide="${a.icon || 'bot'}" class="w-5 h-5" style="color:${iconColor}"></i>
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-white font-semibold text-sm mb-0.5">${esc(a.label)}</div>
+            <div class="text-white/40 text-xs leading-relaxed">${esc(a.description)}</div>
+          </div>
+          <i data-lucide="arrow-right" class="w-4 h-4 flex-shrink-0 mt-1" style="color:${iconColor};opacity:.5"></i>
+        </div>
+        ${starters ? `
+        <div>
+          <div class="text-[10px] text-white/25 uppercase tracking-wider font-semibold mb-1.5">Prova a chiedere</div>
+          <div class="space-y-1">${starters}</div>
+        </div>` : ''}
+        <div class="flex items-center gap-1.5 text-xs font-medium mt-1" style="color:${iconColor}">
+          <span>Avvia chat</span>
+          <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+        </div>
+      </div>`;
+  }).join('');
+
+  lucide.createIcons({ nodes: [grid] });
+}
+
+// ─── Avvia chat con agente (da starter question) ────────────
+function startChatWith(e, agentKey, btn) {
+  e.stopPropagation();
+  const question = btn.textContent.trim();
+  selectAgent(agentKey, question);
+}
+
+// ─── Seleziona agente e apri chat ───────────────────────────
+async function selectAgent(agentKey, prefillMessage = '') {
+  // Recupera metadati agente
+  try {
+    const res  = await fetch('/ai/api/agents');
+    const data = await res.json();
+    currentAgent = (data.agents || []).find(a => a.key === agentKey);
+  } catch {
+    return;
+  }
+  if (!currentAgent) return;
+
+  // Aggiorna header
+  const color = colorForAgent(currentAgent);
+  document.getElementById('hdr-label').textContent = currentAgent.label;
+  document.getElementById('hdr-desc').textContent  = currentAgent.description;
+
+  const iconEl = document.getElementById('hdr-lucide');
+  iconEl.setAttribute('data-lucide', currentAgent.icon || 'bot');
+  iconEl.style.color = color;
+  document.getElementById('hdr-icon').style.background = `color-mix(in srgb, ${color} 15%, transparent)`;
+  document.getElementById('hdr-icon').style.borderColor = `color-mix(in srgb, ${color} 25%, transparent)`;
+
+  // Messaggio di benvenuto
+  chatMessages.innerHTML = '';
+  chatHistory = [];
+  addWelcomeBubble(currentAgent);
+
+  // Mostra chat
+  agentSelector.style.display = 'none';
+  chatArea.style.display = 'block';
+  lucide.createIcons({ nodes: [chatArea] });
+
+  // Precompila domanda starter se presente
+  if (prefillMessage) {
+    chatInput.value = prefillMessage;
+    autoResize();
+  }
+  chatInput.focus();
+}
+
+// ─── Bubble di benvenuto ────────────────────────────────────
+function addWelcomeBubble(agent) {
+  const color = colorForAgent(agent);
+  const starters = (agent.starter_questions || []).slice(0, 3);
+  const starterHtml = starters.map(q =>
+    `<li class="flex items-center gap-2">
+      <i data-lucide="circle-dot" class="w-3 h-3 flex-shrink-0" style="color:${color}"></i>
+      <em class="text-white/45">"${esc(q)}"</em>
+    </li>`
+  ).join('');
+
+  const wrap = document.createElement('div');
+  wrap.className = 'flex items-start gap-3';
+  wrap.innerHTML = `
+    <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+         style="background:color-mix(in srgb,${color} 18%,transparent);border:1px solid color-mix(in srgb,${color} 25%,transparent)">
+      <i data-lucide="${agent.icon || 'bot'}" class="w-3.5 h-3.5" style="color:${color}"></i>
+    </div>
+    <div class="flex-1 min-w-0">
+      <div class="text-[11px] text-white/30 mb-1">${esc(agent.label)}</div>
+      <div class="bubble-bot-inner">
+        Ciao! Sono <strong class="text-white/90">${esc(agent.label)}</strong> 👋<br><br>
+        Posso analizzare i tuoi dati e risponderti in linguaggio naturale.
+        ${starters.length ? `<ul class="mt-2 space-y-1">${starterHtml}</ul>` : ''}
+        <p class="mt-2.5 text-white/30 text-xs">💡 Scrivimi una domanda per iniziare.</p>
+      </div>
+    </div>`;
+  chatMessages.appendChild(wrap);
+  lucide.createIcons({ nodes: [wrap] });
+  scrollChat();
+}
+
+// ─── Bubble utente ───────────────────────────────────────────
+function addUserBubble(text) {
+  const wrap = document.createElement('div');
+  wrap.className = 'flex justify-end';
+  wrap.innerHTML = `<div class="bubble-user">${esc(text)}</div>`;
+  chatMessages.appendChild(wrap);
+  scrollChat();
+}
+
+// ─── Contenitore risposta agente ────────────────────────────
+function addAgentResponseContainer() {
+  const color = colorForAgent(currentAgent);
+  const wrap = document.createElement('div');
+  wrap.className = 'flex items-start gap-3';
+  wrap.innerHTML = `
+    <div class="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5"
+         style="background:color-mix(in srgb,${color} 18%,transparent);border:1px solid color-mix(in srgb,${color} 25%,transparent)">
+      <i data-lucide="${currentAgent?.icon || 'bot'}" class="w-3.5 h-3.5" style="color:${color}"></i>
+    </div>
+    <div class="flex-1 min-w-0 space-y-1.5" id="agent-response-body">
+      <!-- Step cards + answer inseriti qui -->
+      <div class="text-[11px] text-white/30 mb-1">${esc(currentAgent?.label || 'Agent')}</div>
+      <div class="flex items-center gap-1.5 py-2" id="typing-row">
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+        <span class="typing-dot"></span>
+      </div>
+    </div>`;
+  chatMessages.appendChild(wrap);
+  lucide.createIcons({ nodes: [wrap] });
+  scrollChat();
+  return wrap.querySelector('#agent-response-body');
+}
+
+// ─── Step: THINK ────────────────────────────────────────────
+function addThinkStep(body, content) {
+  removeTyping(body);
+  const card = document.createElement('div');
+  card.className = 'step-card step-think';
+  const id = 'think-' + Date.now();
+  card.innerHTML = `
+    <button class="step-toggle" onclick="toggleStep(this,'${id}')" style="color:rgba(247,127,0,.8)">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+           class="chev"><polyline points="9 18 15 12 9 6"/></svg>
+      🧠 Ragionamento AI
+      <span class="ml-auto font-normal normal-case tracking-normal text-[9px] opacity-60">${content.length} chars</span>
+    </button>
+    <div class="step-body" id="${id}">${esc(content)}</div>`;
+  body.appendChild(card);
+  scrollChat();
+}
+
+// ─── Step: TOOL_CALL ─────────────────────────────────────────
+function addToolCallStep(body, name, args) {
+  removeTyping(body);
+  const card = document.createElement('div');
+  card.className = 'step-card step-tool';
+
+  // Formatta args come stringa compatta
+  let argsStr = '';
+  try {
+    const filtered = Object.fromEntries(
+      Object.entries(args).filter(([,v]) => v !== null && v !== undefined &&
+        !(Array.isArray(v) && v.length === 0))
+    );
+    argsStr = Object.keys(filtered).length
+      ? JSON.stringify(filtered, null, 0)
+      : '—';
+  } catch { argsStr = JSON.stringify(args); }
+
+  card.innerHTML = `
+    <div class="tool-inline">
+      <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>
+      </svg>
+      <span class="text-blue-400/80 font-semibold">${esc(name)}</span>
+      <code class="text-white/30 text-[10px] truncate max-w-xs">${esc(argsStr)}</code>
+    </div>`;
+
+  // Aggiunge typing indicator per aspettare l'observation
+  const typing = document.createElement('div');
+  typing.className = 'flex items-center gap-1.5 py-2 px-2.5';
+  typing.id = 'typing-row';
+  typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+
+  body.appendChild(card);
+  body.appendChild(typing);
+  scrollChat();
+}
+
+// ─── Step: OBSERVATION ──────────────────────────────────────
+function addObservationStep(body, tool, result) {
+  removeTyping(body);
+  const card = document.createElement('div');
+  card.className = 'step-card step-obs';
+  const id = 'obs-' + Date.now();
+
+  let resultStr;
+  try { resultStr = JSON.stringify(result, null, 2); }
+  catch { resultStr = String(result); }
+
+  // Sintesi breve
+  let summary = '';
+  if (result && typeof result === 'object') {
+    if (result.errore) {
+      summary = `⚠ ${result.errore}`;
+    } else {
+      const keys = Object.keys(result).slice(0, 3).join(', ');
+      const nhcp = result.n_hcp ? ` · ${result.n_hcp} HCP` : '';
+      summary = keys + nhcp;
+    }
+  }
+
+  card.innerHTML = `
+    <button class="step-toggle" onclick="toggleStep(this,'${id}')" style="color:rgba(2,195,154,.8)">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+           class="chev"><polyline points="9 18 15 12 9 6"/></svg>
+      📊 Dati ricevuti: ${esc(tool)}
+      <span class="ml-auto font-normal normal-case tracking-normal text-[9px] opacity-50">${esc(summary)}</span>
+    </button>
+    <div class="step-body" id="${id}">${esc(resultStr)}</div>`;
+
+  // Ripristina typing per aspettare la prossima iterazione
+  const typing = document.createElement('div');
+  typing.className = 'flex items-center gap-1.5 py-2 px-2.5';
+  typing.id = 'typing-row';
+  typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+
+  body.appendChild(card);
+  body.appendChild(typing);
+  scrollChat();
+}
+
+// ─── Step: ANSWER ────────────────────────────────────────────
+function addAnswerBubble(body, content) {
+  removeTyping(body);
+  const div = document.createElement('div');
+  div.className = 'bubble-bot-inner';
+  div.innerHTML = esc(content);
+  body.appendChild(div);
+  scrollChat();
+}
+
+// ─── Bubble errore ───────────────────────────────────────────
+function addErrorBubble(body, content) {
+  removeTyping(body);
+  const div = document.createElement('div');
+  div.className = 'bubble-bot-inner';
+  div.style.borderColor = 'rgba(247,127,0,.2)';
+  div.style.background  = 'rgba(247,127,0,.05)';
+  div.style.color       = 'rgba(247,127,0,.8)';
+  div.innerHTML = `⚠ ${esc(content)}`;
+  body.appendChild(div);
+  scrollChat();
+
+  // Mostra notice appropriata
+  const err = content.toLowerCase();
+  if (err.includes('ollama') || err.includes('connection') || err.includes('raggiungibile')) {
+    document.getElementById('notice-offline').classList.add('visible');
+  } else if (err.includes('non installato') || err.includes('pull')) {
+    document.getElementById('notice-model-text').textContent = content;
+    document.getElementById('notice-model').classList.add('visible');
+  }
+}
+
+// ─── Toggle step collassabile ────────────────────────────────
+function toggleStep(btn, id) {
+  const body = document.getElementById(id);
+  const open = body.classList.toggle('visible');
+  btn.classList.toggle('open', open);
+}
+
+// ─── Rimuovi typing indicator ────────────────────────────────
+function removeTyping(body) {
+  body.querySelectorAll('#typing-row').forEach(el => el.remove());
+}
+
+// ─── Aggiunge typing indicator ───────────────────────────────
+function addTypingRow(body) {
+  const typing = document.createElement('div');
+  typing.id = 'typing-row';
+  typing.className = 'flex items-center gap-1.5 py-2';
+  typing.innerHTML = '<span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span>';
+  body.appendChild(typing);
+  scrollChat();
+}
+
+// ─── Reset stato streaming live ──────────────────────────────
+function resetLiveState() {
+  liveThinkCard = null;
+  liveThinkBody = null;
+  liveThinkText = '';
+  liveAnswerEl  = null;
+  liveAnswerText = '';
+}
+
+// ─── THINK STREAMING ─────────────────────────────────────────
+// Crea la think card vuota (aperta, visibile durante streaming)
+function initLiveThinkCard(body) {
+  removeTyping(body);
+  const id   = 'think-live-' + Date.now();
+  const card = document.createElement('div');
+  card.className = 'step-card step-think';
+  card.innerHTML = `
+    <button class="step-toggle open" onclick="toggleStep(this,'${id}')" style="color:rgba(247,127,0,.8)">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none"
+           stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"
+           class="chev"><polyline points="9 18 15 12 9 6"/></svg>
+      🧠 Ragionamento AI
+      <span class="live-think-chars ml-auto font-normal normal-case tracking-normal text-[9px] opacity-60">…</span>
+    </button>
+    <div class="step-body visible" id="${id}" style="max-height:120px"></div>`;
+  body.appendChild(card);
+  liveThinkCard = card;
+  liveThinkBody = card.querySelector('.step-body');
+  liveThinkText = '';
+  scrollChat();
+}
+
+// Appende un chunk di thinking alla card live
+function appendThinkChunk(body, chunk) {
+  if (!liveThinkBody) initLiveThinkCard(body);
+  liveThinkText += chunk;
+  liveThinkBody.textContent = liveThinkText;
+  // Auto-scroll interno alla card
+  liveThinkBody.scrollTop = liveThinkBody.scrollHeight;
+  scrollChat();
+}
+
+// Finalizza think card: aggiorna char count e collassa
+function finalizeThinkCard(totalChars) {
+  if (!liveThinkCard) return;
+  const charsEl = liveThinkCard.querySelector('.live-think-chars');
+  if (charsEl) charsEl.textContent = `${totalChars} chars`;
+  // Collassa automaticamente dopo la risposta
+  const bodyEl = liveThinkCard.querySelector('.step-body');
+  const btnEl  = liveThinkCard.querySelector('.step-toggle');
+  if (bodyEl) bodyEl.classList.remove('visible');
+  if (btnEl)  btnEl.classList.remove('open');
+  liveThinkCard = null;
+  liveThinkBody = null;
+}
+
+// ─── ANSWER STREAMING ────────────────────────────────────────
+// Crea la bubble risposta vuota (aperta durante streaming)
+function initLiveAnswer(body) {
+  removeTyping(body);
+  liveAnswerEl   = document.createElement('div');
+  liveAnswerEl.className = 'bubble-bot-inner';
+  liveAnswerText = '';
+  body.appendChild(liveAnswerEl);
+  scrollChat();
+}
+
+// Appende un chunk di risposta alla bubble live
+function appendAnswerChunk(body, chunk) {
+  if (!liveAnswerEl) initLiveAnswer(body);
+  liveAnswerText += chunk;
+  liveAnswerEl.innerHTML = esc(liveAnswerText);
+  scrollChat();
+}
+
+// Finalizza answer bubble (già streamata — rimuove solo il cursore)
+function finalizeAnswer() {
+  liveAnswerEl  = null;
+  liveAnswerText = '';
+}
+
+// Cancella la bubble risposta (era content che precedeva tool_calls)
+function cancelAnswer(body) {
+  if (liveAnswerEl) {
+    liveAnswerEl.remove();
+    liveAnswerEl   = null;
+    liveAnswerText = '';
+  }
+  addTypingRow(body);
+}
+
+// ─── Invia messaggio ─────────────────────────────────────────
+async function sendMessage() {
+  if (isGenerating || !currentAgent) return;
+  const msg = chatInput.value.trim();
+  if (!msg) return;
+
+  isGenerating = true;
+  resetLiveState();   // azzera stato streaming live
+  chatInput.value = '';
+  chatInput.style.height = '';
+  btnSend.disabled = true;
+  btnSend.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i>';
+  lucide.createIcons({ nodes: [btnSend] });
+  stepCounter.textContent = '';
+
+  // Nascondi notice
+  document.getElementById('notice-offline').classList.remove('visible');
+  document.getElementById('notice-model').classList.remove('visible');
+
+  addUserBubble(msg);
+  const responseBody = addAgentResponseContainer();
+
+  let stepCount = 0;
+
+  try {
+    const res = await fetch('/ai/api/agent', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify({
+        agent:   currentAgent.key,
+        message: msg,
+        history: chatHistory.slice(-4),   // max 4 turni per ridurre input tokens
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: `HTTP ${res.status}` }));
+      addErrorBubble(responseBody, err.error || `Errore ${res.status}`);
+    } else {
+      const reader  = res.body.getReader();
+      const decoder = new TextDecoder();
+      let   buf     = '';
+      let   answerContent = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+
+        const lines = buf.split('\n');
+        buf = lines.pop();
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6).trim();
+          if (raw === '[DONE]') break;
+
+          let evt;
+          try { evt = JSON.parse(raw); } catch { continue; }
+
+          switch (evt.type) {
+
+            // ── Streaming thinking live (nuovo) ──────────────
+            case 'think_chunk':
+              appendThinkChunk(responseBody, evt.content || '');
+              break;
+            case 'think_end':
+              finalizeThinkCard(evt.total_chars || liveThinkText.length);
+              break;
+
+            // ── Streaming risposta live (nuovo) ──────────────
+            case 'answer_chunk':
+              appendAnswerChunk(responseBody, evt.content || '');
+              break;
+            case 'answer_done':
+              answerContent = liveAnswerText;
+              finalizeAnswer();
+              break;
+            case 'cancel_answer':
+              cancelAnswer(responseBody);
+              break;
+
+            // ── Fallback eventi non-streaming ────────────────
+            case 'think':
+              // Emesso da versioni precedenti del backend
+              addThinkStep(responseBody, evt.content || '');
+              break;
+            case 'answer':
+              answerContent = evt.content || '';
+              addAnswerBubble(responseBody, answerContent);
+              break;
+
+            // ── Tool call + observation (invariati) ───────────
+            case 'tool_call':
+              stepCount++;
+              stepCounter.textContent = `Step ${stepCount}`;
+              addToolCallStep(responseBody, evt.name || '', evt.args || {});
+              break;
+            case 'observation':
+              addObservationStep(responseBody, evt.tool || '', evt.result || {});
+              break;
+
+            case 'error':
+              addErrorBubble(responseBody, evt.content || 'Errore sconosciuto');
+              break;
+          }
+        }
+      }
+
+      // Salva in history solo la risposta finale
+      if (answerContent) {
+        chatHistory.push({ role: 'user',      content: msg });
+        chatHistory.push({ role: 'assistant', content: answerContent });
+      }
+    }
+  } catch (e) {
+    addErrorBubble(responseBody, `Errore di connessione: ${e.message}`);
+  }
+
+  btnSend.disabled = false;
+  btnSend.innerHTML = '<i data-lucide="send" class="w-4 h-4"></i>';
+  lucide.createIcons({ nodes: [btnSend] });
+  isGenerating = false;
+  stepCounter.textContent = '';
+  chatInput.focus();
+}
+
+// ─── Check Ollama status ─────────────────────────────────────
+async function checkOllamaStatus() {
+  const dot  = ollamaStatus.querySelector('div');
+  const txt  = ollamaStatus.querySelector('span');
+  try {
+    const res  = await fetch('/ai/api/models');
+    const data = await res.json();
+    if (data.ollama_online) {
+      dot.className    = 'w-1.5 h-1.5 rounded-full bg-success animate-pulse';
+      txt.textContent  = 'Ollama online';
+      txt.className    = 'text-success text-[11px]';
+    } else {
+      dot.className   = 'w-1.5 h-1.5 rounded-full bg-warning';
+      txt.textContent = 'Ollama offline';
+      txt.className   = 'text-warning text-[11px]';
+    }
+  } catch {
+    dot.className   = 'w-1.5 h-1.5 rounded-full bg-danger';
+    txt.textContent = 'Errore';
+  }
+}
+
+// ─── Auto-resize textarea ────────────────────────────────────
+function autoResize() {
+  chatInput.style.height = '';
+  chatInput.style.height = Math.min(chatInput.scrollHeight, 110) + 'px';
+}
+
+// ─── Init ────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  lucide.createIcons();
+  checkOllamaStatus();
+  loadAgents();
+
+  // Torna al selettore
+  btnBack.addEventListener('click', () => {
+    chatArea.style.display    = 'none';
+    agentSelector.style.display = '';
+    currentAgent = null;
+    chatHistory  = [];
+  });
+
+  // Pulisci chat
+  btnClear.addEventListener('click', () => {
+    chatMessages.innerHTML = '';
+    chatHistory = [];
+    if (currentAgent) addWelcomeBubble(currentAgent);
+    document.getElementById('notice-offline').classList.remove('visible');
+    document.getElementById('notice-model').classList.remove('visible');
+  });
+
+  // Invio
+  chatInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+  chatInput.addEventListener('input', autoResize);
+  btnSend.addEventListener('click', sendMessage);
+});
+</script>
+{% endblock %}

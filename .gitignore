@@ -1,0 +1,39 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+.env
+
+# Data (file Excel - non versionati)
+data_raw/
+
+# Node
+node_modules/
+package-lock.json
+
+# Tailwind compiled output (rigenerato dal build)
+app/static/css/tailwind.output.css
+
+# Database e istanze locali
+instance/
+*.db
+*.sqlite3
+
+# Log
+*.log
+flask_log.txt
+
+# File spurii
+nul
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp

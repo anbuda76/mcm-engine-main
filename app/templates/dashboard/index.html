@@ -1,0 +1,439 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+{% block page_title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="space-y-5">
+
+  <!-- ── Gradient Banner ── -->
+  <div class="gradient-banner">
+    <div class="relative z-10 flex items-start justify-between">
+      <div>
+        <div class="flex items-center gap-2 mb-1">
+          <i data-lucide="brain-circuit" class="w-5 h-5 text-white/80"></i>
+          <span class="text-[11px] font-semibold tracking-widest uppercase text-white/50">BHAVE Platform</span>
+        </div>
+        <h2 class="text-xl font-bold text-white leading-tight">MCM Engine</h2>
+        <p class="text-white/55 text-sm mt-0.5">Multichannel Marketing Analytics — misura ogni punto di contatto con gli HCP</p>
+      </div>
+      <!-- KPI pillars compact -->
+      <div class="flex items-center gap-2 flex-shrink-0">
+        <div class="flex flex-col items-center px-3 py-2 rounded-xl bg-white/8 border border-white/10">
+          <span class="text-white font-bold text-base leading-none">20</span>
+          <span class="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider">Canali</span>
+        </div>
+        <div class="flex flex-col items-center px-3 py-2 rounded-xl bg-white/8 border border-white/10">
+          <span class="text-white font-bold text-base leading-none">3</span>
+          <span class="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider">Macro-aree</span>
+        </div>
+        <div class="flex flex-col items-center px-3 py-2 rounded-xl bg-white/8 border border-white/10">
+          <span class="text-white font-bold text-base leading-none">4</span>
+          <span class="text-white/40 text-[9px] mt-0.5 uppercase tracking-wider">KPI chiave</span>
+        </div>
+      </div>
+    </div>
+    <div class="absolute right-6 top-4 w-20 h-20 rounded-full bg-white/5 blur-sm"></div>
+    <div class="absolute right-12 bottom-2 w-10 h-10 rounded-full bg-white/5"></div>
+  </div>
+
+  <!-- ── Moduli Analisi ── -->
+  <div>
+    <div class="section-title">
+      <i data-lucide="grid-2x2" class="w-3 h-3"></i>
+      Moduli Analisi
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+
+      <!-- Comportamento -->
+      <a href="{{ url_for('modulo1.index') }}" class="module-card">
+        <div class="flex items-start justify-between w-full">
+          <div class="module-icon bg-accent/15 border border-accent/20">
+            <i data-lucide="users-round" class="w-5 h-5 text-accent"></i>
+          </div>
+          <span class="badge badge-accent text-[9px]">✓ Attivo</span>
+        </div>
+        <div>
+          <div class="module-title">Comportamento</div>
+          <div class="module-desc">KPI Canali · Mappe · Funnel HCP · OCV Mix</div>
+        </div>
+        <div class="flex items-center gap-1 text-accent text-xs font-medium mt-auto">
+          <span>Apri modulo</span>
+          <i data-lucide="arrow-right" class="w-3 h-3"></i>
+        </div>
+      </a>
+
+      <!-- Performance -->
+      <a href="{{ url_for('modulo2.index') }}" class="module-card">
+        <div class="flex items-start justify-between w-full">
+          <div class="module-icon bg-secondary/15 border border-secondary/20">
+            <i data-lucide="bar-chart-3" class="w-5 h-5 text-secondary"></i>
+          </div>
+          <span class="badge badge-accent text-[9px]">✓ Attivo</span>
+        </div>
+        <div>
+          <div class="module-title">Performance</div>
+          <div class="module-desc">Benchmark vs mercato · Competitor · KPI comparativi</div>
+        </div>
+        <div class="flex items-center gap-1 text-secondary text-xs font-medium mt-auto">
+          <span>Apri modulo</span>
+          <i data-lucide="arrow-right" class="w-3 h-3"></i>
+        </div>
+      </a>
+
+      <!-- Trend -->
+      <a href="{{ url_for('trend.index') }}" class="module-card">
+        <div class="flex items-start justify-between w-full">
+          <div class="module-icon bg-blue-500/15 border border-blue-500/20">
+            <i data-lucide="trending-up" class="w-5 h-5 text-blue-300"></i>
+          </div>
+          <span class="badge badge-accent text-[9px]">✓ Attivo</span>
+        </div>
+        <div>
+          <div class="module-title">Trend</div>
+          <div class="module-desc">Serie storiche · Canali per Anno · Heatmap</div>
+        </div>
+        <div class="flex items-center gap-1 text-blue-300 text-xs font-medium mt-auto">
+          <span>Apri modulo</span>
+          <i data-lucide="arrow-right" class="w-3 h-3"></i>
+        </div>
+      </a>
+
+      <!-- AI Agent -->
+      <a href="{{ url_for('ai.index') }}" class="module-card">
+        <div class="flex items-start justify-between w-full">
+          <div class="module-icon bg-purple-500/15 border border-purple-500/20">
+            <i data-lucide="bot" class="w-5 h-5 text-purple-300"></i>
+          </div>
+          <span class="badge badge-accent text-[9px]">✓ Attivo</span>
+        </div>
+        <div>
+          <div class="module-title">AI Agent</div>
+          <div class="module-desc">Chat · Reasoning · Analisi dati in linguaggio naturale</div>
+        </div>
+        <div class="flex items-center gap-1 text-purple-300 text-xs font-medium mt-auto">
+          <span>Apri modulo</span>
+          <i data-lucide="arrow-right" class="w-3 h-3"></i>
+        </div>
+      </a>
+
+    </div>
+  </div>
+
+  <!-- ── Journey Multicanale ── -->
+  <div>
+    <div class="section-title">
+      <i data-lucide="route" class="w-3 h-3"></i>
+      Journey Multicanale — Cosa Misuriamo
+    </div>
+
+    <div class="kpi-card">
+
+      <!-- Intro header -->
+      <div class="flex items-start justify-between mb-5">
+        <div>
+          <h3 class="text-white font-semibold text-sm mb-1.5">Misuriamo l'efficacia di ogni punto di contatto con gli HCP</h3>
+          <p class="text-white/40 text-xs leading-relaxed max-w-2xl">
+            MCM Engine copre <span class="text-accent font-semibold">20 canali</span> distribuiti in 3 macro-aree: per ognuno misuriamo
+            <span class="text-white/65">penetrazione</span>, <span class="text-white/65">ricordo</span>, <span class="text-white/65">ingaggio</span> e <span class="text-white/65">utilità percepita</span> — dando una visione completa del journey e del mix ottimale.
+          </p>
+        </div>
+        <!-- KPI legend -->
+        <div class="flex flex-col gap-1.5 ml-6 flex-shrink-0">
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-accent/10 border border-accent/20">
+            <i data-lucide="eye" class="w-3 h-3 text-accent"></i>
+            <span class="text-[10px] text-accent font-semibold">Penetrazione canale</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/10 border border-secondary/20">
+            <i data-lucide="brain" class="w-3 h-3 text-secondary"></i>
+            <span class="text-[10px] text-secondary font-semibold">Ricordo & Ingaggio</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20">
+            <i data-lucide="zap" class="w-3 h-3 text-purple-300"></i>
+            <span class="text-[10px] text-purple-300 font-semibold">OCV & Performance</span>
+          </div>
+          <div class="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-blue-500/10 border border-blue-500/20">
+            <i data-lucide="sliders-horizontal" class="w-3 h-3 text-blue-300"></i>
+            <span class="text-[10px] text-blue-300 font-semibold">Utilità percepita</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Mappa canali ─── -->
+      <div class="flex gap-0 items-stretch">
+
+        <!-- ── DIGITALI ── -->
+        <div class="flex-[5] min-w-0 px-3 py-3 rounded-xl border border-accent/15 bg-accent/3 mr-3">
+          <!-- Category label -->
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-5 h-5 rounded-md bg-accent/15 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="wifi" class="w-3 h-3 text-accent"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-widest uppercase text-accent/80">Digitali</span>
+            <div class="flex-1 h-px bg-accent/15"></div>
+            <span class="text-[9px] text-accent/40 font-medium">14 sotto-canali</span>
+          </div>
+          <!-- 5 channel nodes -->
+          <div class="grid grid-cols-5 gap-1">
+
+            <!-- Siti Web -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-accent/12 border border-accent/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="globe" class="w-4 h-4 text-accent"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Siti Web</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Prodotto · Login</span>
+            </div>
+
+            <!-- Messaggi Social -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-accent/12 border border-accent/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="message-circle" class="w-4 h-4 text-accent"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Social</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">DM · WhatsApp</span>
+            </div>
+
+            <!-- Video Call -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-accent/12 border border-accent/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="video" class="w-4 h-4 text-accent"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Video Call</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Webcall · FAD</span>
+            </div>
+
+            <!-- Email -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-accent/12 border border-accent/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="mail" class="w-4 h-4 text-accent"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Email</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Newsletter · ISF</span>
+            </div>
+
+            <!-- Riviste Digitali -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-accent/12 border border-accent/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="tablet" class="w-4 h-4 text-accent"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Riv. Digitali</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Art. · Pubblicità</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── FACCIA A FACCIA ── -->
+        <div class="flex-[2] min-w-0 px-3 py-3 rounded-xl border border-warning/20 bg-warning/3 mr-3">
+          <!-- Category label -->
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-5 h-5 rounded-md bg-warning/15 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="handshake" class="w-3 h-3 text-warning"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-widest uppercase text-warning/80 whitespace-nowrap">F2F</span>
+            <div class="flex-1 h-px bg-warning/15"></div>
+          </div>
+          <!-- 2 channel nodes -->
+          <div class="grid grid-cols-2 gap-1">
+
+            <!-- Congressi -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-warning/12 border border-warning/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="presentation" class="w-4 h-4 text-warning"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Congressi</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Naz. · Intl.</span>
+            </div>
+
+            <!-- ISF F2F -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-warning/12 border border-warning/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="user-check" class="w-4 h-4 text-warning"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">ISF F2F</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Visita medica</span>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- ── TRADIZIONALI ── -->
+        <div class="flex-[4] min-w-0 px-3 py-3 rounded-xl border border-secondary/20 bg-secondary/3">
+          <!-- Category label -->
+          <div class="flex items-center gap-2 mb-4">
+            <div class="w-5 h-5 rounded-md bg-secondary/15 flex items-center justify-center flex-shrink-0">
+              <i data-lucide="newspaper" class="w-3 h-3 text-secondary"></i>
+            </div>
+            <span class="text-[10px] font-bold tracking-widest uppercase text-secondary/80">Tradizionali</span>
+            <div class="flex-1 h-px bg-secondary/15"></div>
+            <span class="text-[9px] text-secondary/40 font-medium">6 sotto-canali</span>
+          </div>
+          <!-- 4 channel nodes -->
+          <div class="grid grid-cols-4 gap-1">
+
+            <!-- SMS -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-secondary/12 border border-secondary/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="smartphone" class="w-4 h-4 text-secondary"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">SMS</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Informativi</span>
+            </div>
+
+            <!-- Chiamata -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-secondary/12 border border-secondary/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="phone" class="w-4 h-4 text-secondary"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Telefono</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">ISF tel.</span>
+            </div>
+
+            <!-- Riviste Cartacee -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-secondary/12 border border-secondary/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="book-open" class="w-4 h-4 text-secondary"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Riv. Cartacee</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Art. · Pubblicità</span>
+            </div>
+
+            <!-- Posta -->
+            <div class="flex flex-col items-center gap-1.5 p-1.5 rounded-xl hover:bg-white/4 transition-colors group cursor-default">
+              <div class="w-10 h-10 rounded-full bg-secondary/12 border border-secondary/25 flex items-center justify-center group-hover:scale-110 transition-transform">
+                <i data-lucide="send" class="w-4 h-4 text-secondary"></i>
+              </div>
+              <span class="text-[8.5px] font-semibold text-white/65 text-center leading-tight uppercase tracking-wide">Leaflet</span>
+              <span class="text-[7.5px] text-white/25 text-center leading-tight">Visual / DM</span>
+            </div>
+
+          </div>
+        </div>
+
+      </div>
+      <!-- END Mappa canali -->
+
+      <!-- ─── Bottom: 3 value pillars ─── -->
+      <div class="grid grid-cols-3 gap-3 mt-5 pt-4 border-t border-white/5">
+
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-accent/10 border border-accent/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i data-lucide="target" class="w-3.5 h-3.5 text-accent"></i>
+          </div>
+          <div>
+            <div class="text-white/80 font-semibold text-xs mb-0.5">Comportamento HCP</div>
+            <div class="text-white/30 text-[10px] leading-relaxed">KPI per canale, funnel di conversione e mappa utilità vs penetrazione</div>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-secondary/10 border border-secondary/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i data-lucide="trophy" class="w-3.5 h-3.5 text-secondary"></i>
+          </div>
+          <div>
+            <div class="text-white/80 font-semibold text-xs mb-0.5">Performance Aziende</div>
+            <div class="text-white/30 text-[10px] leading-relaxed">Benchmark vs mercato, attributi relazionali e gap analysis competitiva</div>
+          </div>
+        </div>
+
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-lg bg-purple-500/10 border border-purple-500/15 flex items-center justify-center flex-shrink-0 mt-0.5">
+            <i data-lucide="bot" class="w-3.5 h-3.5 text-purple-300"></i>
+          </div>
+          <div>
+            <div class="text-white/80 font-semibold text-xs mb-0.5">AI Agent & Insights</div>
+            <div class="text-white/30 text-[10px] leading-relaxed">Analisi in linguaggio naturale, what-if scenarios e raccomandazioni strategiche</div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Stato sistema ── -->
+  <div>
+    <div class="section-title">
+      <i data-lucide="activity" class="w-3 h-3"></i>
+      Stato Sistema
+    </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+
+      <div class="kpi-card flex items-center gap-4">
+        <div class="kpi-icon bg-success/15 border border-success/20">
+          <i data-lucide="server" class="w-5 h-5 text-success"></i>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-sm">Flask Server</div>
+          <div class="flex items-center gap-1.5 mt-1">
+            <div class="w-1.5 h-1.5 bg-success rounded-full status-dot"></div>
+            <span class="text-[11px] text-white/40">Attivo su localhost:5001</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card flex items-center gap-4">
+        <div class="kpi-icon bg-accent/15 border border-accent/20">
+          <i data-lucide="file-spreadsheet" class="w-5 h-5 text-accent"></i>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-sm">Comportamento HCP</div>
+          <div class="flex items-center gap-1.5 mt-1">
+            <div class="w-1.5 h-1.5 bg-accent rounded-full status-dot"></div>
+            <span class="text-[11px] text-white/40">
+              {% if cache_info and cache_info.n_beh %}{{ cache_info.n_beh | int }} record{% else %}Excel caricato{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card flex items-center gap-4">
+        <div class="kpi-icon bg-secondary/15 border border-secondary/20">
+          <i data-lucide="database-zap" class="w-5 h-5 text-secondary"></i>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-sm">Performance Channel</div>
+          <div class="flex items-center gap-1.5 mt-1">
+            <div class="w-1.5 h-1.5 bg-secondary rounded-full status-dot"></div>
+            <span class="text-[11px] text-white/40">
+              {% if cache_info and cache_info.n_perf %}{{ cache_info.n_perf | int }} record{% else %}Excel caricato{% endif %}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="kpi-card flex items-center gap-4">
+        <div class="kpi-icon bg-white/8 border border-white/10">
+          <i data-lucide="clock" class="w-5 h-5 text-white/40"></i>
+        </div>
+        <div class="min-w-0">
+          <div class="text-white font-semibold text-sm">Cache Dati</div>
+          {% if cache_info and cache_info.loaded_at %}
+            <div class="flex items-center gap-1.5 mt-1">
+              {% if cache_info.remaining_m and cache_info.remaining_m > 0 %}
+                <div class="w-1.5 h-1.5 bg-success rounded-full flex-shrink-0"></div>
+                <span class="text-[11px] text-white/40 truncate">Scade tra {{ cache_info.remaining_m }}min</span>
+              {% else %}
+                <div class="w-1.5 h-1.5 bg-warning rounded-full flex-shrink-0"></div>
+                <span class="text-[11px] text-warning/70 truncate">Scaduta</span>
+              {% endif %}
+            </div>
+          {% else %}
+            <div class="flex items-center gap-1.5 mt-1">
+              <div class="w-1.5 h-1.5 bg-white/20 rounded-full flex-shrink-0"></div>
+              <span class="text-[11px] text-white/30">Non caricata</span>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

@@ -1,0 +1,1170 @@
+{% extends "base.html" %}
+{% block title %}Trend{% endblock %}
+{% block page_title %}Modulo 3 — Trend Temporali{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <!-- ── Header + Filtri ── -->
+  <div class="kpi-card space-y-4">
+
+    <!-- Titolo + descrizione -->
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <i data-lucide="trending-up" class="w-5 h-5 text-blue-300"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-semibold text-sm">Trend Temporali per Azienda</div>
+        <div class="text-white/50 text-xs mt-0.5 leading-relaxed">
+          Analizza l'evoluzione nel tempo di Penetrazione, Ricordo, Ingaggio, Propensione e NPS
+          per <span class="text-white/70 font-medium">azienda focus</span> e prodotti selezionati.
+          Dati disponibili per gli anni <span class="text-white/70 font-medium">{{ anni | join(', ') }}</span>
+          su <span class="text-white/70 font-medium">{{ n_canali }} canali</span> di comunicazione pharma.
+        </div>
+      </div>
+      <span id="hcp-badge" class="badge badge-accent hidden flex-shrink-0"></span>
+    </div>
+
+    <!-- Riga filtri -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- Azienda Focus -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Azienda Focus *</label>
+        <select id="sel-azienda" class="dark-select w-full" style="height:34px">
+          <option value="">— Seleziona azienda —</option>
+          {% for az in aziende %}
+            <option value="{{ az }}">{{ az }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Prodotti (multi-select, caricati dinamicamente) -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Prodotti (opzionale)</label>
+        <select id="sel-prodotti" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          <option disabled>Seleziona prima l'azienda</option>
+        </select>
+      </div>
+
+      <!-- Specializzazione -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Specializzazione</label>
+        <select id="sel-spec" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          {% for s in specializzazioni %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Pulsante Calcola Trend + status bar -->
+    <div class="flex items-center gap-3 pt-1">
+      <button id="btn-load"
+        class="flex items-center gap-2.5 px-6 py-2.5 bg-accent hover:bg-accent/80 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-accent/20 whitespace-nowrap">
+        <i data-lucide="play-circle" class="w-4 h-4"></i>
+        Calcola Trend
+      </button>
+      <div id="load-hint" class="text-xs text-white/30 italic">
+        Seleziona l'azienda e clicca <strong class="text-white/50">Calcola Trend</strong> per visualizzare l'evoluzione KPI
+      </div>
+      <div id="load-status" class="hidden text-xs text-accent flex items-center gap-1.5">
+        <i id="load-status-icon" data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+        <span id="load-status-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Insufficient data state ── -->
+  <div id="insufficient-state" class="kpi-card hidden">
+    <div class="flex flex-col items-center justify-center py-10 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center mb-4">
+        <i data-lucide="clock" class="w-7 h-7 text-warning/60"></i>
+      </div>
+      <div class="text-white/80 text-sm font-semibold mb-2">Dati in aggiornamento incrementale</div>
+      <div class="text-white/40 text-xs max-w-sm leading-relaxed mb-5">
+        Il campione per l'azienda selezionata è in fase di raccolta. I risultati
+        statisticamente significativi saranno disponibili al prossimo aggiornamento del panel.
+      </div>
+      <div id="insuf-badge" class="badge badge-warning px-3 py-1.5 text-xs mb-3"></div>
+      <div class="text-white/25 text-[11px] mt-1">
+        Soglia minima per l'analisi: <span class="text-white/40 font-medium">20 HCP</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Empty state (pre-analisi) ── -->
+  <div id="empty-state" class="kpi-card flex flex-col items-center justify-center py-14 text-center">
+    <div class="w-14 h-14 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center mb-4">
+      <i data-lucide="trending-up" class="w-7 h-7 text-blue-300/50"></i>
+    </div>
+    <div class="text-white/50 text-sm font-medium mb-1">Nessuna analisi avviata</div>
+    <div class="text-white/25 text-xs mb-6">Seleziona l'azienda focus e clicca <strong class="text-white/40">Calcola Trend</strong></div>
+    <div class="grid grid-cols-3 md:grid-cols-6 gap-3 max-w-2xl">
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="trending-up" class="w-4 h-4 text-blue-300/50"></i>
+        <span class="text-[10px] text-white/25">Timeline</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="signal" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">Penetrazione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="brain" class="w-4 h-4 text-blue-400/50"></i>
+        <span class="text-[10px] text-white/25">Ricordo</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="zap" class="w-4 h-4 text-yellow-400/50"></i>
+        <span class="text-[10px] text-white/25">Ingaggio</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="thumbs-up" class="w-4 h-4 text-success/50"></i>
+        <span class="text-[10px] text-white/25">Propensione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="gauge" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">NPS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KPI Summary (evoluzione ultimo anno) ── -->
+  <div id="kpi-summary" class="hidden">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3" id="kpi-cards"></div>
+  </div>
+
+  <!-- ── Tab bar (hidden until first analysis) ── -->
+  <div class="tab-bar hidden" id="tab-container">
+    <button class="tab-btn" data-tab="serie">
+      <i data-lucide="line-chart" class="w-3.5 h-3.5"></i> Serie Storiche
+    </button>
+    <button class="tab-btn" data-tab="canali">
+      <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> Canali per Anno
+    </button>
+    <button class="tab-btn" data-tab="download">
+      <i data-lucide="download" class="w-3.5 h-3.5"></i> Download
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 1 — SERIE STORICHE
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-serie" class="tab-panel hidden space-y-4">
+
+    <!-- Legenda + toggle granularità -->
+    <div class="kpi-card py-2.5">
+      <div class="flex items-center gap-4 text-xs text-white/50 flex-wrap">
+        <div class="flex items-center gap-1.5">
+          <div class="w-4 h-0.5 bg-accent rounded"></div>
+          <span id="legend-azienda" class="text-white/70">Azienda Focus</span>
+        </div>
+        <div class="flex items-center gap-1.5 text-white/30">
+          <div class="w-4 h-0.5 border-t-2 border-dashed border-white/25 rounded"></div>
+          <span>Prodotti (linee tratteggiate)</span>
+        </div>
+        <div id="legend-prodotti" class="flex items-center gap-3 flex-wrap"></div>
+
+        <!-- Toggle granularità -->
+        <div class="ml-auto flex items-center gap-1 bg-white/5 rounded-lg p-0.5 border border-white/10 flex-shrink-0">
+          <button data-gran="annual"
+            class="px-3 py-1 text-[11px] rounded-md border transition-all font-medium bg-accent text-white border-accent/40">
+            <i data-lucide="calendar" class="w-3 h-3 inline-block mr-1 -mt-0.5"></i>Annuale
+          </button>
+          <button data-gran="quarterly"
+            class="px-3 py-1 text-[11px] rounded-md border transition-all font-medium bg-white/0 text-white/50 border-transparent">
+            <i data-lucide="calendar-range" class="w-3 h-3 inline-block mr-1 -mt-0.5"></i>Per Quarter
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Filtro anno (sempre visibile in entrambe le modalità) -->
+    <div id="year-filter-row" class="kpi-card py-2.5 hidden">
+      <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-[11px] text-white/40 uppercase tracking-wider whitespace-nowrap">Anni visualizzati</span>
+        <div id="year-filter-buttons" class="flex gap-2 flex-wrap"></div>
+        <div id="quarter-legend-box" class="ml-auto hidden flex items-center gap-3 text-xs text-white/40 flex-shrink-0">
+          <div class="flex items-center gap-1.5">
+            <svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="#00A896" stroke-width="2.5"/><circle cx="10" cy="5" r="3.5" fill="#00A896"/></svg>
+            <span>Dati reali</span>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <svg width="20" height="10"><line x1="0" y1="5" x2="20" y2="5" stroke="#00A896" stroke-width="1.5" stroke-dasharray="3 2"/><circle cx="10" cy="5" r="4" fill="none" stroke="#00A896" stroke-width="1.5" opacity="0.7"/></svg>
+            <span>Tendenza stimata</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Riga 1: Penetrazione + Ricordo -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="signal" class="w-3.5 h-3.5 text-accent"></i>
+          Penetrazione Media nel Tempo (%)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Evoluzione anno per anno della penetrazione media su tutti i canali: % di HCP raggiunti dall'azienda tramite almeno un canale di comunicazione pharma.</span>
+          </span>
+        </div>
+        <div id="chart-pen-trend" style="height:320px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="brain" class="w-3.5 h-3.5 text-blue-300"></i>
+          Ricordo Medio nel Tempo (%)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Evoluzione del ricordo medio: % di HCP che ricordano di aver ricevuto comunicazioni aziendali tramite i canali attivi. Indicatore di memorabilità e continuità della presenza.</span>
+          </span>
+        </div>
+        <div id="chart-ric-trend" style="height:320px"></div>
+      </div>
+    </div>
+
+    <!-- Riga 2: Ingaggio + Propensione -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i>
+          Ingaggio Medio nel Tempo (%)
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Evoluzione dell'engagement medio: % di HCP che ha interagito attivamente con i contenuti (condivisione + approfondimento). Misura l'efficacia delle attività di engagement year-over-year.</span>
+          </span>
+        </div>
+        <div id="chart-ing-trend" style="height:320px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="thumbs-up" class="w-3.5 h-3.5 text-success"></i>
+          Propensione Media nel Tempo
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Evoluzione della propensione media al consiglio (scala 0–10). Score ≥7 indica alta propensione prescrittiva. Monitora l'impatto delle campagne sulla fiducia dell'HCP nel prodotto.</span>
+          </span>
+        </div>
+        <div id="chart-prop-trend" style="height:320px"></div>
+      </div>
+    </div>
+
+    <!-- Riga 3: NPS (centrata, 2/3 larghezza) -->
+    <div class="chart-container max-w-2xl">
+      <div class="chart-title">
+        <i data-lucide="gauge" class="w-3.5 h-3.5 text-accent"></i>
+        NPS nel Tempo
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Net Promoter Score nel tempo: % Promotori (voto 9–10) meno % Detrattori (voto 0–6). Range −100/+100. Valori positivi e crescenti indicano un miglioramento della percezione del brand.</span>
+        </span>
+      </div>
+      <div id="chart-nps-trend" style="height:280px"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 2 — CANALI PER ANNO
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-canali" class="tab-panel hidden space-y-4">
+
+    <!-- Selettore anno -->
+    <div class="kpi-card py-3">
+      <div class="flex items-center gap-3 flex-wrap">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider whitespace-nowrap">Anno visualizzato</label>
+        <div id="anno-buttons" class="flex gap-2 flex-wrap"></div>
+      </div>
+    </div>
+
+    <!-- Bar chart penetrazione + ricordo per anno selezionato -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="signal" class="w-3.5 h-3.5 text-accent"></i>
+          Penetrazione per Canale —
+          <span id="lbl-anno-pen" class="text-accent ml-0.5">—</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">% di HCP raggiunti dall'azienda tramite ogni singolo canale nell'anno selezionato. Confronta i valori tra anni usando i pulsanti sopra.</span>
+          </span>
+        </div>
+        <div id="chart-pen-anno" style="height:440px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="brain" class="w-3.5 h-3.5 text-blue-300"></i>
+          Ricordo per Canale —
+          <span id="lbl-anno-ric" class="text-blue-300 ml-0.5">—</span>
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">% di HCP esposti al canale che ricordano di aver ricevuto comunicazioni aziendali nell'anno selezionato. Indica la memorabilità per singolo canale.</span>
+          </span>
+        </div>
+        <div id="chart-ric-anno" style="height:440px"></div>
+      </div>
+    </div>
+
+    <!-- Heatmap: penetrazione × anni × canali -->
+    <div class="chart-container">
+      <div class="chart-title">
+        <i data-lucide="grid" class="w-3.5 h-3.5 text-blue-300"></i>
+        Heatmap Penetrazione — Canali × Anni
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Mappa visuale dell'intensità di penetrazione per ogni canale nel tempo. Il colore più intenso (verde scuro) indica la penetrazione più alta. Permette di identificare canali in crescita o declino strutturale.</span>
+        </span>
+      </div>
+      <div id="chart-heatmap" style="height:500px"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 3 — DOWNLOAD
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-download" class="tab-panel hidden">
+    <div class="kpi-card max-w-lg">
+      <div class="chart-title mb-4">
+        <i data-lucide="file-down" class="w-4 h-4 text-blue-300"></i>
+        Export Excel — Trend Temporali
+      </div>
+      <div class="space-y-2 text-sm text-white/50 mb-5">
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Sheet KPI per periodo (Azienda Focus)</div>
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-success"></i> Sheet Serie Storica con grafico linea</div>
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-blue-300"></i> Sheet per ogni prodotto selezionato</div>
+        <div class="flex items-center gap-2 text-white/30"><i data-lucide="info" class="w-3.5 h-3.5"></i> Anni disponibili: {{ anni | join(', ') }}</div>
+      </div>
+      <button id="btn-export"
+        class="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent/80 text-white font-medium rounded-lg transition-colors text-sm">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        Scarica Excel
+      </button>
+    </div>
+  </div>
+
+</div><!-- /space-y-4 -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ═══════════════════════════════════════════════════════
+// MODULO 3 — Trend Temporali — JavaScript
+// ═══════════════════════════════════════════════════════
+
+// ── Stato corrente ────────────────────────────────────
+let currentAzienda  = '';
+let currentProdotti = [];
+let currentTargets  = [];
+let trendData       = null;
+let quarterlyData   = null;
+let loadingQuart    = false;
+let granularity     = 'annual';   // 'annual' | 'quarterly'
+let activeYears     = [];         // anni attivi nel filtro
+let selectedAnno    = null;
+
+// ── Colori dark per Plotly ────────────────────────────
+const C = {
+  accent:   '#00A896',
+  blue:     '#60a5fa',
+  warning:  '#F77F00',
+  success:  '#02C39A',
+  bg:       'rgba(0,0,0,0)',
+  grid:     'rgba(255,255,255,0.05)',
+  text:     'rgba(255,255,255,0.5)',
+};
+
+const PALETTE = [
+  '#00A896','#60a5fa','#F77F00','#f472b6','#a78bfa',
+  '#34d399','#fcd34d','#fb923c','#818cf8','#6ee7b7',
+];
+
+// ── Layout base Plotly dark ───────────────────────────
+function baseLayout(extra = {}) {
+  return {
+    paper_bgcolor: C.bg, plot_bgcolor: C.bg,
+    font: { family: 'Inter, sans-serif', size: 11, color: C.text },
+    xaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    yaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    margin: { t: 20, r: 20, b: 50, l: 60 },
+    hoverlabel: {
+      bgcolor:     '#0d1117',
+      bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+    showlegend: false,
+    ...extra,
+  };
+}
+
+function plot(divId, traces, layout) {
+  const _el = document.getElementById(divId);
+  if (_el) _el.innerHTML = '';
+  Plotly.newPlot(divId, traces, layout, { responsive: true, displayModeBar: false });
+}
+
+// ══════════════════════════════════════════════════════
+// TAB 1 — SERIE STORICHE — modalità ANNUALE
+// ══════════════════════════════════════════════════════
+
+function buildLineSeries(kpi, prodotti, metricKey, label) {
+  // Filtra per anni attivi
+  let anni = Object.keys(kpi).sort();
+  if (activeYears.length) anni = anni.filter(a => activeYears.includes(a));
+
+  const traces = [];
+
+  // Azienda Focus — linea continua accent
+  traces.push({
+    type: 'scatter', mode: 'lines+markers',
+    name: currentAzienda,
+    x: anni,
+    y: anni.map(a => kpi[a] && kpi[a].valid ? kpi[a][metricKey] : null),
+    line:   { color: C.accent, width: 2.5 },
+    marker: { color: C.accent, size: 7 },
+    hovertemplate: `<b>${currentAzienda}</b><br>${label}: %{y:.1f}<extra></extra>`,
+  });
+
+  // Prodotti — linee tratteggiate
+  Object.entries(prodotti || {}).forEach(([prod, dati], i) => {
+    const col = PALETTE[(i + 1) % PALETTE.length];
+    traces.push({
+      type: 'scatter', mode: 'lines+markers',
+      name: prod,
+      x: anni,
+      y: anni.map(a => dati[a] && dati[a].valid ? dati[a][metricKey] : null),
+      line:   { color: col, width: 1.8, dash: 'dash' },
+      marker: { color: col, size: 6 },
+      hovertemplate: `<b>${prod}</b><br>${label}: %{y:.1f}<extra></extra>`,
+    });
+  });
+
+  return traces;
+}
+
+function renderTrendLine(divId, kpi, prodotti, metricKey, label, yRange = null) {
+  const traces = buildLineSeries(kpi, prodotti, metricKey, label);
+  plot(divId, traces, baseLayout({
+    showlegend: traces.length > 1,
+    legend: { orientation: 'h', y: -0.22, font: { size: 10 }, bgcolor: 'transparent' },
+    yaxis: yRange
+      ? { gridcolor: C.grid, zerolinecolor: C.grid, range: yRange, tickfont: { size: 10 } }
+      : { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    xaxis: { gridcolor: C.grid, zerolinecolor: C.grid, type: 'category', tickfont: { size: 10 } },
+    margin: { t: 20, r: 20, b: 55, l: 50 },
+  }));
+}
+
+function renderAllTrend(data) {
+  const kpi  = data.kpi;
+  const prod = data.prodotti || {};
+
+  renderTrendLine('chart-pen-trend',  kpi, prod, 'pen_media',  'Penetrazione (%)', [0, 100]);
+  renderTrendLine('chart-ric-trend',  kpi, prod, 'ric_media',  'Ricordo (%)',       [0, 100]);
+  renderTrendLine('chart-ing-trend',  kpi, prod, 'ing_media',  'Ingaggio (%)',      [0, 100]);
+  renderTrendLine('chart-prop-trend', kpi, prod, 'prop_media', 'Propensione',       [0, 10]);
+  renderTrendLine('chart-nps-trend',  kpi, prod, 'nps',        'NPS',               [-100, 100]);
+}
+
+// ══════════════════════════════════════════════════════
+// TAB 1 — SERIE STORICHE — modalità QUARTERLY
+// ══════════════════════════════════════════════════════
+
+function xLabel(p) {
+  // "2024_Q1" → "2024 Q1"
+  return p.replace('_Q', ' Q');
+}
+
+// ── Helper: separa i periodi in reali / gap-interni / futuri ──
+// Un periodo stimato è "interno" se è cronologicamente prima dell'
+// ultimo periodo reale; è "futuro" se viene dopo.
+function splitEstimated(periodi, kpiMap) {
+  const realPeriodi = periodi.filter(p => kpiMap[p] && !kpiMap[p]?.estimated);
+  const lastReal    = realPeriodi.at(-1) ?? '';
+  const interior    = periodi.filter(p => kpiMap[p]?.estimated && p <  lastReal);
+  const future      = periodi.filter(p => kpiMap[p]?.estimated && p >= lastReal);
+  return { realPeriodi, interior, future };
+}
+
+// ── Helper: aggiunge il punto reale di ancoraggio per la linea futura ──
+function futureBridge(futureEst, realPeriodi) {
+  if (!futureEst.length) return [];
+  const anchor = realPeriodi.at(-1);
+  return anchor ? [anchor, ...futureEst] : futureEst;
+}
+
+function buildQuarterSeries(kpi, prodotti, metricKey, label) {
+  // Tutti i periodi ordinati, filtrati per anni attivi
+  let periodi = Object.keys(kpi).sort();
+  if (activeYears.length) {
+    periodi = periodi.filter(p => activeYears.includes(p.split('_')[0]));
+  }
+
+  const { realPeriodi, interior, future } = splitEstimated(periodi, kpi);
+  const traces = [];
+
+  // ── Azienda — dati reali ─────────────────────────────────
+  // connectgaps: true → Plotly connette automaticamente i punti
+  // reali attraverso i gap dove manca il dato (nei gap sarà
+  // sovrapposta la traccia dei cerchi interpolati).
+  traces.push({
+    type: 'scatter', mode: 'lines+markers',
+    name: currentAzienda,
+    x: realPeriodi.map(xLabel),
+    y: realPeriodi.map(p => kpi[p]?.valid ? kpi[p][metricKey] : null),
+    line:        { color: C.accent, width: 2.5 },
+    marker:      { color: C.accent, size: 7, symbol: 'circle' },
+    connectgaps: true,
+    hovertemplate: `<b>${currentAzienda}</b><br>${label}: %{y:.1f}<extra></extra>`,
+  });
+
+  // ── Azienda — gap interni interpolati (solo cerchio aperto) ─
+  // Nessuna linea: quella è già fornita da connectgaps sopra.
+  if (interior.length) {
+    traces.push({
+      type: 'scatter', mode: 'markers',
+      name: `${currentAzienda} (interpolato)`,
+      x: interior.map(xLabel),
+      y: interior.map(p => kpi[p]?.valid ? kpi[p][metricKey] : null),
+      marker: {
+        color: 'rgba(0,0,0,0)', size: 9, symbol: 'circle-open',
+        line: { color: C.accent, width: 2 },
+      },
+      showlegend: false,
+      hovertemplate: `<b>${currentAzienda} · gap interpolato</b><br>${label}: %{y:.1f}<extra></extra>`,
+    });
+  }
+
+  // ── Azienda — tendenza futura (linea puntinata + cerchi aperti) ─
+  if (future.length) {
+    const bridge = futureBridge(future, realPeriodi);
+    traces.push({
+      type: 'scatter', mode: 'lines+markers',
+      name: `${currentAzienda} (tendenza)`,
+      x: bridge.map(xLabel),
+      y: bridge.map(p => kpi[p]?.valid ? kpi[p][metricKey] : null),
+      line:   { color: C.accent, width: 1.5, dash: 'dot' },
+      marker: { color: C.accent, size: 8, symbol: 'circle-open', opacity: 0.75 },
+      opacity:    0.65,
+      showlegend: false,
+      hovertemplate: `<b>${currentAzienda} · tendenza</b><br>${label}: %{y:.1f}<extra></extra>`,
+    });
+  }
+
+  // ── Prodotti ─────────────────────────────────────────────
+  Object.entries(prodotti || {}).forEach(([prod, dati], i) => {
+    const col  = PALETTE[(i + 1) % PALETTE.length];
+    const pAll = periodi.filter(p => dati[p]);
+    const { realPeriodi: pReal, interior: pInt, future: pFut } = splitEstimated(pAll, dati);
+
+    // Reali (tratteggiato, punti pieni, connectgaps)
+    traces.push({
+      type: 'scatter', mode: 'lines+markers',
+      name: prod,
+      x: pReal.map(xLabel),
+      y: pReal.map(p => dati[p]?.valid ? dati[p][metricKey] : null),
+      line:        { color: col, width: 1.8, dash: 'dash' },
+      marker:      { color: col, size: 6 },
+      connectgaps: true,
+      hovertemplate: `<b>${prod}</b><br>${label}: %{y:.1f}<extra></extra>`,
+    });
+
+    // Gap interni interpolati (solo cerchi aperti)
+    if (pInt.length) {
+      traces.push({
+        type: 'scatter', mode: 'markers',
+        x: pInt.map(xLabel),
+        y: pInt.map(p => dati[p]?.valid ? dati[p][metricKey] : null),
+        marker: { color: 'rgba(0,0,0,0)', size: 8, symbol: 'circle-open',
+                  line: { color: col, width: 1.8 } },
+        showlegend: false,
+        hovertemplate: `<b>${prod} · gap interpolato</b><br>${label}: %{y:.1f}<extra></extra>`,
+      });
+    }
+
+    // Tendenza futura
+    if (pFut.length) {
+      const pBridge = futureBridge(pFut, pReal);
+      traces.push({
+        type: 'scatter', mode: 'lines+markers',
+        x: pBridge.map(xLabel),
+        y: pBridge.map(p => dati[p]?.valid ? dati[p][metricKey] : null),
+        line:   { color: col, width: 1.2, dash: 'dot' },
+        marker: { color: col, size: 6, symbol: 'circle-open', opacity: 0.65 },
+        opacity:    0.55,
+        showlegend: false,
+        hovertemplate: `<b>${prod} · tendenza</b><br>${label}: %{y:.1f}<extra></extra>`,
+      });
+    }
+  });
+
+  return traces;
+}
+
+function renderTrendQuarter(divId, kpi, prodotti, metricKey, label, yRange = null) {
+  const traces = buildQuarterSeries(kpi, prodotti, metricKey, label);
+  plot(divId, traces, baseLayout({
+    showlegend: traces.filter(t => t.showlegend !== false).length > 1,
+    legend: { orientation: 'h', y: -0.28, font: { size: 10 }, bgcolor: 'transparent' },
+    yaxis: yRange
+      ? { gridcolor: C.grid, zerolinecolor: C.grid, range: yRange, tickfont: { size: 10 } }
+      : { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    xaxis: {
+      gridcolor: C.grid, zerolinecolor: C.grid,
+      type: 'category', tickfont: { size: 9 }, tickangle: -35,
+    },
+    margin: { t: 20, r: 20, b: 75, l: 50 },
+  }));
+}
+
+function renderAllQuarterly() {
+  if (!quarterlyData) return;
+  const kpi  = quarterlyData.kpi;
+  const prod = quarterlyData.prodotti || {};
+
+  renderTrendQuarter('chart-pen-trend',  kpi, prod, 'pen_media',  'Penetrazione (%)', [0, 100]);
+  renderTrendQuarter('chart-ric-trend',  kpi, prod, 'ric_media',  'Ricordo (%)',       [0, 100]);
+  renderTrendQuarter('chart-ing-trend',  kpi, prod, 'ing_media',  'Ingaggio (%)',      [0, 100]);
+  renderTrendQuarter('chart-prop-trend', kpi, prod, 'prop_media', 'Propensione',       [0, 10]);
+  renderTrendQuarter('chart-nps-trend',  kpi, prod, 'nps',        'NPS',               [-100, 100]);
+}
+
+// ── Fetch dati quarterly (lazy, al primo switch) ──────
+async function loadQuarterlyData() {
+  if (!currentAzienda || loadingQuart) return;
+  loadingQuart = true;
+
+  // Spinner sui grafici
+  ['chart-pen-trend','chart-ric-trend','chart-ing-trend','chart-prop-trend','chart-nps-trend'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.innerHTML = `
+      <div class="flex items-center justify-center h-full gap-2 text-white/30 text-xs">
+        <i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Calcolo quarter...
+      </div>`;
+  });
+  lucide.createIcons();
+
+  try {
+    const res = await fetch('/trend/api/kpi_quarter', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        azienda:  currentAzienda,
+        prodotti: currentProdotti,
+        target:   currentTargets,
+      }),
+    });
+    quarterlyData = await res.json();
+
+    if (quarterlyData.error) {
+      console.error('Quarter error:', quarterlyData.error);
+      loadingQuart = false;
+      setGranularity('annual');
+      return;
+    }
+
+    // Inizializza activeYears con tutti gli anni presenti
+    const allYears = [...new Set((quarterlyData.periodi || []).map(p => p.split('_')[0]))].sort();
+    activeYears = [...allYears];
+    buildYearFilterButtons(allYears);
+    renderAllQuarterly();
+
+  } catch (err) {
+    console.error('Errore quarterly:', err);
+    setGranularity('annual');
+  } finally {
+    loadingQuart = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// FILTRO ANNO (funziona sia in annual che quarterly)
+// ══════════════════════════════════════════════════════
+
+function buildYearFilterButtons(years) {
+  const container = document.getElementById('year-filter-buttons');
+  if (!container) return;
+  container.innerHTML = '';
+
+  years.forEach(y => {
+    const btn = document.createElement('button');
+    btn.dataset.year = y;
+    btn.textContent  = String(y);
+    const isActive   = activeYears.includes(String(y));
+    btn.className    = `px-3 py-1 text-xs rounded-lg border font-medium transition-all ${
+      isActive
+        ? 'bg-accent text-white border-accent/40'
+        : 'text-white/60 border-white/20 hover:border-accent/40 hover:text-white/80'
+    }`;
+    btn.addEventListener('click', () => {
+      const yStr = String(y);
+      if (activeYears.includes(yStr)) {
+        if (activeYears.length > 1) activeYears = activeYears.filter(x => x !== yStr);
+      } else {
+        activeYears = [...activeYears, yStr].sort();
+      }
+      buildYearFilterButtons(years);
+      // Re-render in modalità corrente
+      if (granularity === 'annual' && trendData) renderAllTrend(trendData);
+      else if (granularity === 'quarterly' && quarterlyData) renderAllQuarterly();
+    });
+    container.appendChild(btn);
+  });
+}
+
+function showYearFilterRow(allYears) {
+  const row = document.getElementById('year-filter-row');
+  if (!row) return;
+  row.classList.remove('hidden');
+  buildYearFilterButtons(allYears);
+
+  // Mostra la legenda stima solo in quarterly
+  const qLeg = document.getElementById('quarter-legend-box');
+  if (qLeg) qLeg.classList.toggle('hidden', granularity !== 'quarterly');
+}
+
+// ══════════════════════════════════════════════════════
+// TOGGLE GRANULARITÀ (Annuale / Per Quarter)
+// ══════════════════════════════════════════════════════
+
+function setGranularity(mode) {
+  granularity = mode;
+
+  document.querySelectorAll('[data-gran]').forEach(b => {
+    const isActive = b.dataset.gran === mode;
+    b.classList.toggle('bg-accent',       isActive);
+    b.classList.toggle('text-white',      isActive);
+    b.classList.toggle('border-accent/40',isActive);
+    b.classList.toggle('bg-white/0',      !isActive);
+    b.classList.toggle('text-white/50',   !isActive);
+    b.classList.toggle('border-transparent', !isActive);
+  });
+
+  // Legenda "stima" visibile solo in quarterly
+  const qLeg = document.getElementById('quarter-legend-box');
+  if (qLeg) qLeg.classList.toggle('hidden', mode !== 'quarterly');
+
+  if (mode === 'annual') {
+    if (trendData) renderAllTrend(trendData);
+  } else {
+    if (!quarterlyData) {
+      loadQuarterlyData();          // lazy load
+    } else {
+      renderAllQuarterly();
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════
+// KPI SUMMARY CARDS
+// ══════════════════════════════════════════════════════
+
+function renderSummaryCards(data) {
+  const kpi  = data.kpi;
+  const anni = Object.keys(kpi).sort();
+  if (!anni.length) return;
+
+  // Usa l'ultimo anno con dati reali (non stimati)
+  const realAnni = anni.filter(a => kpi[a]?.valid && !kpi[a]?.estimated);
+  if (!realAnni.length) return;
+
+  const last = realAnni[realAnni.length - 1];
+  const prev = realAnni.length > 1 ? realAnni[realAnni.length - 2] : null;
+  const cur  = kpi[last];
+  const pre  = prev ? kpi[prev] : null;
+
+  document.getElementById('kpi-summary').classList.remove('hidden');
+
+  function deltaHtml(now, before) {
+    if (now == null || before == null) return '';
+    const d   = now - before;
+    const cls = d >= 0 ? 'text-success' : 'text-red-400';
+    return `<span class="${cls} text-xs">${d >= 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+  }
+
+  const metrics = [
+    { key: 'pen_media',  label: 'Penetrazione', unit: '%' },
+    { key: 'ric_media',  label: 'Ricordo',      unit: '%' },
+    { key: 'ing_media',  label: 'Ingaggio',     unit: '%' },
+    { key: 'prop_media', label: 'Propensione',  unit: '' },
+    { key: 'nps',        label: 'NPS',          unit: '' },
+  ];
+
+  const container = document.getElementById('kpi-cards');
+  container.innerHTML = '';
+  metrics.forEach(m => {
+    const val  = cur && cur.valid  ? cur[m.key]  : null;
+    const pval = pre && pre.valid  ? pre[m.key]  : null;
+    const div  = document.createElement('div');
+    div.className = 'kpi-card';
+    div.innerHTML = `
+      <div class="kpi-label">${m.label} <span class="text-white/25">(${last})</span></div>
+      <div class="kpi-value">${val != null ? val.toFixed(1) + m.unit : '—'}</div>
+      <div class="flex items-center gap-2 mt-1">
+        ${deltaHtml(val, pval)}
+        ${prev ? `<span class="text-white/25 text-xs">vs ${prev}</span>` : ''}
+      </div>
+    `;
+    container.appendChild(div);
+  });
+}
+
+// ══════════════════════════════════════════════════════
+// TAB 2 — CANALI PER ANNO
+// ══════════════════════════════════════════════════════
+
+function renderCanaliAnno(kpiData, anno) {
+  const d = kpiData[anno];
+  if (!d || !d.valid) return;
+
+  selectedAnno = anno;
+  document.querySelectorAll('#lbl-anno-pen, #lbl-anno-ric').forEach(el => el.textContent = anno);
+
+  document.querySelectorAll('#anno-buttons button').forEach(b => {
+    const isActive = b.dataset.anno === String(anno);
+    b.classList.toggle('bg-accent',        isActive);
+    b.classList.toggle('text-white',       isActive);
+    b.classList.toggle('border-accent/40', isActive);
+    b.classList.toggle('border-white/20',  !isActive);
+    b.classList.toggle('text-white/60',    !isActive);
+  });
+
+  const pen = [...(d.pen_canali || [])].sort((a, b) =>
+    (a['Penetrazione (%)'] || 0) - (b['Penetrazione (%)'] || 0));
+  plot('chart-pen-anno', [{
+    type: 'bar', orientation: 'h',
+    x: pen.map(r => r['Penetrazione (%)']),
+    y: pen.map(r => r['Canale']),
+    marker: { color: C.accent, opacity: 0.85 },
+    text: pen.map(r => r['Penetrazione (%)'] != null ? r['Penetrazione (%)'].toFixed(1) + '%' : ''),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Penetrazione: %{x:.1f}%<extra></extra>',
+  }], baseLayout({ margin: { t: 20, r: 80, b: 30, l: 190 } }));
+
+  const ric = [...(d.ric_canali || [])]
+    .filter(r => r['Canale'] !== 'TOTALE AZIENDA')
+    .sort((a, b) => (a['Ricorda (%)'] || 0) - (b['Ricorda (%)'] || 0));
+  plot('chart-ric-anno', [{
+    type: 'bar', orientation: 'h',
+    x: ric.map(r => r['Ricorda (%)']),
+    y: ric.map(r => r['Canale']),
+    marker: { color: C.blue, opacity: 0.85 },
+    text: ric.map(r => r['Ricorda (%)'] != null ? r['Ricorda (%)'].toFixed(1) + '%' : ''),
+    textposition: 'outside',
+    hovertemplate: '<b>%{y}</b><br>Ricordo: %{x:.1f}%<extra></extra>',
+  }], baseLayout({ margin: { t: 20, r: 80, b: 30, l: 190 } }));
+}
+
+function renderHeatmap(kpiData) {
+  const anni      = Object.keys(kpiData).sort();
+  const anniValid = anni.filter(a =>
+    kpiData[a] && kpiData[a].valid && !kpiData[a].estimated &&
+    (kpiData[a].pen_canali || []).length);
+  if (!anniValid.length) return;
+
+  const canali = [...new Set(anniValid.flatMap(a =>
+    (kpiData[a].pen_canali || []).map(r => r['Canale'])))];
+
+  const z = canali.map(canale =>
+    anniValid.map(anno => {
+      const row = (kpiData[anno].pen_canali || []).find(r => r['Canale'] === canale);
+      return row ? row['Penetrazione (%)'] : null;
+    })
+  );
+
+  plot('chart-heatmap', [{
+    type: 'heatmap',
+    x: anniValid, y: canali, z,
+    colorscale: [
+      [0,   'rgba(30,39,97,0.3)'],
+      [0.4, 'rgba(2,128,144,0.6)'],
+      [1,   '#00A896'],
+    ],
+    hovertemplate: '<b>%{y}</b><br>%{x}: %{z:.1f}%<extra></extra>',
+    showscale: true,
+  }], {
+    paper_bgcolor: C.bg, plot_bgcolor: C.bg,
+    font:  { family: 'Inter, sans-serif', size: 10, color: C.text },
+    xaxis: { tickfont: { size: 11 }, color: C.text },
+    yaxis: { tickfont: { size: 10 }, color: C.text },
+    margin: { t: 20, r: 80, b: 30, l: 190 },
+    hoverlabel: {
+      bgcolor: '#0d1117', bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+  });
+}
+
+function buildAnnoButtons(anni) {
+  const container = document.getElementById('anno-buttons');
+  container.innerHTML = '';
+  // Mostra solo anni con dati reali nella Tab Canali
+  const realAnni = anni.filter(a => trendData.kpi[a]?.valid && !trendData.kpi[a]?.estimated);
+  realAnni.forEach(anno => {
+    const btn = document.createElement('button');
+    btn.dataset.anno = String(anno);
+    btn.textContent  = String(anno);
+    btn.className    = 'px-3 py-1 text-xs rounded-lg border transition-colors text-white/60 border-white/20 hover:border-accent/40 hover:text-white/80';
+    btn.addEventListener('click', () => renderCanaliAnno(trendData.kpi, anno));
+    container.appendChild(btn);
+  });
+  if (realAnni.length) renderCanaliAnno(trendData.kpi, realAnni[realAnni.length - 1]);
+}
+
+// ══════════════════════════════════════════════════════
+// STATI UI
+// ══════════════════════════════════════════════════════
+
+function showResults() {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.add('hidden');
+  document.getElementById('tab-container').classList.remove('hidden');
+}
+
+function showInsufficientData(nHcp, azienda) {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.remove('hidden');
+  document.getElementById('tab-container').classList.add('hidden');
+  document.getElementById('kpi-summary').classList.add('hidden');
+  document.getElementById('year-filter-row').classList.add('hidden');
+
+  const plural = nHcp === 1 ? 'HCP rilevato' : 'HCP rilevati';
+  document.getElementById('insuf-badge').textContent = `${nHcp} ${plural} — ${azienda}`;
+
+  const badge = document.getElementById('hcp-badge');
+  badge.textContent = nHcp + ' HCP';
+  badge.classList.remove('hidden');
+
+  document.getElementById('load-status-icon').setAttribute('data-lucide', 'alert-triangle');
+  document.getElementById('load-status').className = 'text-xs text-warning flex items-center gap-1.5';
+  setLoadStatus(`Campione insufficiente · ${azienda}`, false);
+  lucide.createIcons();
+}
+
+function setLoadStatus(text, isOk = true) {
+  document.getElementById('load-hint').classList.add('hidden');
+  const status = document.getElementById('load-status');
+  status.classList.remove('hidden');
+  if (isOk) {
+    status.className = 'text-xs text-accent flex items-center gap-1.5';
+    document.getElementById('load-status-icon').setAttribute('data-lucide', 'check-circle');
+    lucide.createIcons();
+  }
+  document.getElementById('load-status-text').textContent = text;
+}
+
+// ──────────────────────────────────────────────────────
+// LOAD PRODOTTI (dinamico su cambio azienda)
+// ──────────────────────────────────────────────────────
+
+async function loadProdotti(azienda) {
+  const sel = document.getElementById('sel-prodotti');
+  sel.innerHTML = '<option disabled>Caricamento...</option>';
+  try {
+    const res = await fetch('/trend/api/meta?azienda=' + encodeURIComponent(azienda));
+    const d   = await res.json();
+    sel.innerHTML = '';
+    (d.prodotti || []).forEach(p => {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = p;
+      sel.appendChild(opt);
+    });
+    if (!(d.prodotti || []).length)
+      sel.innerHTML = '<option disabled>Nessun prodotto disponibile</option>';
+  } catch {
+    sel.innerHTML = '<option disabled>Errore caricamento</option>';
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// LOAD DATA — chiama /trend/api/kpi
+// ──────────────────────────────────────────────────────
+
+async function loadData() {
+  const azienda  = document.getElementById('sel-azienda').value.trim();
+  const prodotti = Array.from(document.getElementById('sel-prodotti').selectedOptions).map(o => o.value);
+  const targets  = Array.from(document.getElementById('sel-spec').selectedOptions).map(o => o.value);
+
+  if (!azienda) {
+    document.getElementById('load-hint').classList.remove('hidden');
+    document.getElementById('load-hint').textContent = '⚠ Seleziona prima un\'azienda focus.';
+    return;
+  }
+
+  currentAzienda  = azienda;
+  currentProdotti = prodotti;
+  currentTargets  = targets;
+
+  // Reset stato quarterly al cambio analisi
+  quarterlyData = null;
+  activeYears   = [];
+  granularity   = 'annual';
+  // Ripristina toggle visivo su Annuale
+  document.querySelectorAll('[data-gran]').forEach(b => {
+    const isA = b.dataset.gran === 'annual';
+    b.classList.toggle('bg-accent',          isA);
+    b.classList.toggle('text-white',         isA);
+    b.classList.toggle('border-accent/40',   isA);
+    b.classList.toggle('bg-white/0',        !isA);
+    b.classList.toggle('text-white/50',     !isA);
+    b.classList.toggle('border-transparent',!isA);
+  });
+  document.getElementById('year-filter-row').classList.add('hidden');
+
+  const btn = document.getElementById('btn-load');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Calcolo in corso...';
+  lucide.createIcons();
+
+  try {
+    const res  = await fetch('/trend/api/kpi', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ azienda, prodotti, target: targets }),
+    });
+    const data = await res.json();
+
+    if (data.insufficient_data) {
+      showInsufficientData(data.n_hcp_az, data.azienda || azienda);
+      return;
+    }
+    if (data.error) {
+      console.error('Trend error:', data.error);
+      setLoadStatus('Errore: ' + data.error, false);
+      return;
+    }
+
+    trendData = data;
+
+    // Inizializza filtro anni (tutti attivi di default)
+    const allYears = (data.anni || []).map(String).sort();
+    activeYears = [...allYears];
+
+    showResults();
+
+    const badge = document.getElementById('hcp-badge');
+    badge.textContent = azienda;
+    badge.classList.remove('hidden');
+
+    const leg = document.getElementById('legend-prodotti');
+    leg.innerHTML = '';
+    Object.keys(data.prodotti || {}).forEach((prod, i) => {
+      const col = PALETTE[(i + 1) % PALETTE.length];
+      leg.innerHTML += `<div class="flex items-center gap-1.5"><div class="w-3 h-0.5 border-t-2 border-dashed rounded" style="border-color:${col};width:12px"></div><span>${prod}</span></div>`;
+    });
+    document.getElementById('legend-azienda').textContent = azienda;
+
+    renderSummaryCards(data);
+    renderAllTrend(data);
+    buildAnnoButtons(data.anni);
+    renderHeatmap(data.kpi);
+
+    // Mostra filtro anno
+    showYearFilterRow(allYears);
+
+    setLoadStatus(`${azienda} · Anni: ${allYears.join(', ')}`, true);
+
+    if (!document.querySelector('.tab-btn.active'))
+      document.querySelector('[data-tab="serie"]').click();
+
+  } catch (err) {
+    console.error('Errore di rete:', err);
+    setLoadStatus('Errore connessione: ' + err.message, false);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="play-circle" class="w-4 h-4"></i> Calcola Trend';
+    lucide.createIcons();
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// DOWNLOAD EXCEL
+// ──────────────────────────────────────────────────────
+
+async function downloadExcel() {
+  if (!currentAzienda) {
+    setLoadStatus('Calcola prima un trend per scaricare i dati.', false);
+    document.querySelector('[data-tab="serie"]').click();
+    return;
+  }
+
+  const btn = document.getElementById('btn-export');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Preparazione...';
+  lucide.createIcons();
+
+  try {
+    const res = await fetch('/trend/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        azienda:  currentAzienda,
+        prodotti: currentProdotti,
+        target:   currentTargets,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Errore server' }));
+      console.error('Export error:', err.error || res.statusText);
+      return;
+    }
+
+    const blob  = await res.blob();
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    const label = `${currentAzienda}_Trend`.replace(/\s+/g, '_');
+    a.href     = url;
+    a.download = `MCM_Trend_${label}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    console.error('Download error:', err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Scarica Excel';
+    lucide.createIcons();
+  }
+}
+
+// ──────────────────────────────────────────────────────
+// INIT
+// ──────────────────────────────────────────────────────
+
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs('tab-container');
+  lucide.createIcons();
+
+  document.getElementById('btn-load').addEventListener('click', loadData);
+  document.getElementById('btn-export').addEventListener('click', downloadExcel);
+
+  document.getElementById('sel-azienda').addEventListener('change', function () {
+    if (this.value) loadProdotti(this.value);
+  });
+
+  // Toggle granularità
+  document.querySelectorAll('[data-gran]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!trendData) return;          // nessun dato ancora
+      setGranularity(btn.dataset.gran);
+    });
+  });
+
+  // Lazy re-render canali/heatmap al click sul tab
+  document.querySelectorAll('[data-tab="canali"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (trendData) {
+        buildAnnoButtons(trendData.anni);
+        renderHeatmap(trendData.kpi);
+      }
+    });
+  });
+});
+</script>
+{% endblock %}

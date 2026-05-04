@@ -1,0 +1,1314 @@
+{% extends "base.html" %}
+{% block title %}Performance{% endblock %}
+{% block page_title %}Modulo 2 — Performance vs Mercato{% endblock %}
+
+{% block content %}
+<div class="space-y-4">
+
+  <!-- ── Header + Filtri ── -->
+  <div class="kpi-card space-y-4">
+
+    <!-- Titolo + descrizione -->
+    <div class="flex items-start gap-3">
+      <div class="w-10 h-10 rounded-xl bg-secondary/15 border border-secondary/20 flex items-center justify-center flex-shrink-0 mt-0.5">
+        <i data-lucide="bar-chart-3" class="w-5 h-5 text-secondary"></i>
+      </div>
+      <div class="flex-1 min-w-0">
+        <div class="text-white font-semibold text-sm">Performance vs Mercato</div>
+        <div class="text-white/50 text-xs mt-0.5 leading-relaxed">
+          Confronta le performance della tua <span class="text-white/70 font-medium">azienda focus</span> contro
+          fino a <span class="text-white/70 font-medium">{{ max_competitor }} competitor</span> e il
+          <span class="text-white/70 font-medium">mercato complessivo</span> su
+          <span class="text-white/70 font-medium">{{ n_canali }} canali</span>.
+          Misura Penetrazione, Ricordo, Ingaggio, Propensione e NPS per identificare
+          vantaggi competitivi e aree di miglioramento canale per canale.
+        </div>
+        <div class="flex items-center gap-1.5 mt-1.5">
+          <i data-lucide="info" class="w-3 h-3 text-white/20"></i>
+          <span class="text-[10px] text-white/25 italic">Il mercato include azienda focus + competitor + tutti gli altri brand rilevati nel panel</span>
+        </div>
+      </div>
+      <span id="hcp-badge" class="badge badge-accent hidden flex-shrink-0"></span>
+    </div>
+
+    <!-- Riga filtri -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <!-- Azienda focus -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Azienda Focus <span class="text-accent">*</span></label>
+        <select id="sel-azienda" class="dark-select w-full">
+          <option value="">— Seleziona azienda —</option>
+          {% for az in aziende %}
+            <option value="{{ az }}">{{ az }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Competitor (multi-select, max 10) -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider flex items-center gap-2">
+          Competitor
+          <span class="badge badge-muted text-[10px]">max {{ max_competitor }}</span>
+        </label>
+        <select id="sel-competitor" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          {% for az in aziende %}
+            <option value="{{ az }}">{{ az }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <!-- Specializzazione -->
+      <div class="space-y-1">
+        <label class="text-[11px] text-white/40 uppercase tracking-wider">Specializzazione HCP</label>
+        <select id="sel-spec" multiple size="1"
+          class="dark-select w-full" style="height:34px">
+          {% for s in specializzazioni %}
+            <option value="{{ s }}">{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+
+    <!-- Avviso max competitor -->
+    <div id="warn-competitor" class="hidden flex items-center gap-2 text-xs text-warning/80 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+      <i data-lucide="alert-triangle" class="w-3.5 h-3.5 flex-shrink-0"></i>
+      Selezionati più di {{ max_competitor }} competitor: verranno considerati solo i primi {{ max_competitor }}.
+    </div>
+
+    <!-- Pulsante Avvia Analisi -->
+    <div class="flex items-center gap-3 pt-1">
+      <button id="btn-load"
+        class="flex items-center gap-2.5 px-6 py-2.5 bg-secondary hover:bg-secondary/80 active:scale-95 text-white text-sm font-semibold rounded-xl transition-all shadow-lg shadow-secondary/20 whitespace-nowrap">
+        <i data-lucide="play-circle" class="w-4 h-4"></i>
+        Avvia Analisi
+      </button>
+      <div id="load-hint" class="text-xs text-white/30 italic">
+        Seleziona l'azienda e clicca <strong class="text-white/50">Avvia Analisi</strong> per visualizzare i KPI
+      </div>
+      <div id="load-status" class="hidden text-xs text-accent flex items-center gap-1.5">
+        <i id="load-status-icon" data-lucide="check-circle" class="w-3.5 h-3.5"></i>
+        <span id="load-status-text"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Insufficient data state ── -->
+  <div id="insufficient-state" class="kpi-card hidden">
+    <div class="flex flex-col items-center justify-center py-10 text-center">
+      <div class="w-14 h-14 rounded-2xl bg-warning/10 border border-warning/20 flex items-center justify-center mb-4">
+        <i data-lucide="clock" class="w-7 h-7 text-warning/60"></i>
+      </div>
+      <div class="text-white/80 text-sm font-semibold mb-2">Dati in aggiornamento incrementale</div>
+      <div class="text-white/40 text-xs max-w-sm leading-relaxed mb-5">
+        Il campione per questa azienda e specializzazione è in fase di raccolta. I risultati
+        statisticamente significativi saranno disponibili al prossimo aggiornamento del panel.
+      </div>
+      <div id="insuf-badge" class="badge badge-warning px-3 py-1.5 text-xs mb-3"></div>
+      <div class="text-white/25 text-[11px] mt-1">
+        Soglia minima per l'analisi: <span class="text-white/40 font-medium">20 HCP azienda</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Empty state (pre-analisi) ── -->
+  <div id="empty-state" class="kpi-card flex flex-col items-center justify-center py-14 text-center">
+    <div class="w-14 h-14 rounded-2xl bg-secondary/10 border border-secondary/20 flex items-center justify-center mb-4">
+      <i data-lucide="bar-chart-3" class="w-7 h-7 text-secondary/50"></i>
+    </div>
+    <div class="text-white/50 text-sm font-medium mb-1">Nessuna analisi avviata</div>
+    <div class="text-white/25 text-xs mb-6">Seleziona l'azienda focus e clicca <strong class="text-white/40">Avvia Analisi</strong></div>
+    <div class="grid grid-cols-3 md:grid-cols-5 gap-3 max-w-xl">
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="signal" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">Penetrazione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="brain" class="w-4 h-4 text-blue-400/50"></i>
+        <span class="text-[10px] text-white/25">Ricordo</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="zap" class="w-4 h-4 text-yellow-400/50"></i>
+        <span class="text-[10px] text-white/25">Ingaggio</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="thumbs-up" class="w-4 h-4 text-success/50"></i>
+        <span class="text-[10px] text-white/25">Propensione</span>
+      </div>
+      <div class="flex flex-col items-center gap-1.5 p-3 rounded-xl border border-white/5 bg-white/3">
+        <i data-lucide="gauge" class="w-4 h-4 text-accent/50"></i>
+        <span class="text-[10px] text-white/25">NPS</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── KPI Summary Cards (hidden until first analysis) ── -->
+  <div id="kpi-summary" class="hidden">
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+
+      <div class="kpi-card">
+        <div class="kpi-label">Penetrazione</div>
+        <div class="flex items-end gap-2 mt-1">
+          <span class="kpi-value" id="ks-pen-az">—</span>
+          <div class="text-white/30 text-xs mb-1">vs <span id="ks-pen-merc" class="text-white/50">—</span></div>
+        </div>
+        <div class="kpi-delta" id="ks-pen-delta"></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Ricordo</div>
+        <div class="flex items-end gap-2 mt-1">
+          <span class="kpi-value" id="ks-ric-az">—</span>
+          <div class="text-white/30 text-xs mb-1">vs <span id="ks-ric-merc" class="text-white/50">—</span></div>
+        </div>
+        <div class="kpi-delta" id="ks-ric-delta"></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Ingaggio</div>
+        <div class="flex items-end gap-2 mt-1">
+          <span class="kpi-value" id="ks-ing-az">—</span>
+          <div class="text-white/30 text-xs mb-1">vs <span id="ks-ing-merc" class="text-white/50">—</span></div>
+        </div>
+        <div class="kpi-delta" id="ks-ing-delta"></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">Propensione</div>
+        <div class="kpi-value" id="ks-prop-az">—</div>
+        <div class="text-white/30 text-xs mt-1">vs Mercato <span id="ks-prop-merc">—</span></div>
+      </div>
+
+      <div class="kpi-card">
+        <div class="kpi-label">NPS</div>
+        <div class="kpi-value" id="ks-nps-az">—</div>
+        <div class="text-white/30 text-xs mt-1">vs Mercato <span id="ks-nps-merc">—</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ── Tab bar (hidden until first analysis) ── -->
+  <div class="tab-bar hidden" id="tab-container">
+    <button class="tab-btn" data-tab="kpi">
+      <i data-lucide="bar-chart-2" class="w-3.5 h-3.5"></i> KPI Comparativi
+    </button>
+    <button class="tab-btn" data-tab="tabellone">
+      <i data-lucide="table-2" class="w-3.5 h-3.5"></i> Tabellone
+    </button>
+    <button class="tab-btn" data-tab="canali">
+      <i data-lucide="network" class="w-3.5 h-3.5"></i> Canali Enhanced
+    </button>
+    <button class="tab-btn" data-tab="vs-competitor">
+      <i data-lucide="git-compare" class="w-3.5 h-3.5"></i> Focus vs Competitor
+    </button>
+    <button class="tab-btn" data-tab="download">
+      <i data-lucide="download" class="w-3.5 h-3.5"></i> Download
+    </button>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 1 — KPI COMPARATIVI
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-kpi" class="tab-panel hidden space-y-4">
+
+    <!-- Legenda colori -->
+    <div class="flex items-center gap-4 text-xs text-white/50 px-1">
+      <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#00A896"></div> Azienda Focus</div>
+      <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#F77F00"></div> Competitor</div>
+      <div class="flex items-center gap-1.5"><div class="w-3 h-3 rounded-sm" style="background:#60a5fa"></div> Mercato</div>
+    </div>
+
+    <!-- Riga 1: Penetrazione + Ricordo Focus vs Mercato -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="signal" class="w-3.5 h-3.5 text-accent"></i>
+          Penetrazione: Focus vs Mercato
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Confronto diretto per canale tra la penetrazione dell'azienda focus e il benchmark di mercato. Barre affiancate: verde = Focus, blu = Mercato. Gap positivo = vantaggio di reach.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q9</span>
+        </div>
+        <div id="chart-pen-fvm" style="height:400px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="brain" class="w-3.5 h-3.5 text-blue-300"></i>
+          Ricordo: Focus vs Mercato
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Confronto del ricordo comunicazione per canale: Focus vs benchmark mercato. Sopra la barra mercato = messaggio più memorabile della media. Misura la qualità della comunicazione su ogni canale.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q10</span>
+        </div>
+        <div id="chart-ric-fvm" style="height:400px"></div>
+      </div>
+    </div>
+
+    <!-- Riga 2: Ingaggio + Propensione Focus vs Mercato -->
+    <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="zap" class="w-3.5 h-3.5 text-yellow-400"></i>
+          Ingaggio: Focus vs Mercato
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Confronto dell'ingaggio per canale: Focus vs benchmark mercato. Valori Focus superiori indicano una comunicazione più coinvolgente della media di mercato su quel canale.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q13</span>
+        </div>
+        <div id="chart-ing-fvm" style="height:400px"></div>
+      </div>
+      <div class="chart-container">
+        <div class="chart-title">
+          <i data-lucide="trending-up" class="w-3.5 h-3.5 text-purple-400"></i>
+          Propensione: Focus vs Mercato
+          <span class="chart-info">
+            <i data-lucide="info"></i>
+            <span class="tip">Distribuzione della propensione alla prescrizione (Q16, scala 1–10) per l'azienda focus vs mercato. Top box 9–10 = HCP con alta propensione; Medio 7–8 = buona; Basso 1–6 = da sviluppare.</span>
+          </span>
+          <span class="ml-auto badge badge-muted">Q16</span>
+        </div>
+        <div id="chart-prop-fvm" style="height:400px"></div>
+      </div>
+    </div>
+
+    <!-- Penetrazione Competitor (grouped bar) -->
+    <div class="chart-container" id="wrap-pen-comp">
+      <div class="chart-title">
+        <i data-lucide="signal" class="w-3.5 h-3.5 text-warning"></i>
+        Penetrazione — Competitor (per azienda)
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Penetrazione per singola azienda competitor su ogni canale. Evidenzia dove i competitor investono di più e dove l'azienda focus ha un vantaggio competitivo di reach.</span>
+        </span>
+        <span class="ml-auto badge badge-muted">Q9</span>
+      </div>
+      <div id="chart-pen-comp" style="height:380px"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 2 — TABELLONE COMPARATIVO
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-tabellone" class="tab-panel hidden space-y-4">
+
+    <div class="kpi-card">
+      <div class="chart-title mb-3">
+        <i data-lucide="radar" class="w-3.5 h-3.5 text-secondary"></i>
+        Radar KPI — Azienda vs Competitor vs Mercato
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Confronto visivo su 5 KPI normalizzati scala 0–100: Penetrazione/Ricordo/Ingaggio in %, Propensione ×10, NPS (x+100)/2. Area più ampia = performance complessiva migliore.</span>
+        </span>
+        <span class="ml-auto text-[11px] text-white/30" id="tab-label-az"></span>
+      </div>
+
+      <div id="chart-radar" style="height:380px" class="mb-4"></div>
+
+      <div class="overflow-x-auto">
+        <table class="dark-table" id="table-tab">
+          <thead>
+            <tr>
+              <th>KPI</th>
+              <th class="text-accent">Azienda Focus</th>
+              <th class="text-warning">Competitor (media)</th>
+              <th class="text-blue-400">Mercato</th>
+              <th>Δ vs Mercato</th>
+            </tr>
+          </thead>
+          <tbody id="tbody-tab"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 3 — CANALI ENHANCED
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-canali" class="tab-panel hidden space-y-4">
+
+    <div class="kpi-card">
+      <div class="chart-title mb-1">
+        <i data-lucide="network" class="w-3.5 h-3.5 text-accent"></i>
+        Confronto Canali — Focus vs Competitor vs Mercato
+        <span class="chart-info">
+          <i data-lucide="info"></i>
+          <span class="tip">Analisi avanzata per canale: tutti i KPI calcolati esclusivamente sugli HCP esposti al canale. Fornisce una lettura della qualità per canale senza distorsioni da campione non esposto.</span>
+        </span>
+      </div>
+      <div class="text-[11px] text-white/30 mb-4">
+        Penetrazione, Ricordo, Ingaggio e NPS calcolati per canale (solo HCP esposti al canale)
+      </div>
+
+      <div id="canali-placeholder" class="flex flex-col items-center justify-center py-16 text-white/30 gap-3">
+        <i data-lucide="layers" class="w-10 h-10 opacity-30"></i>
+        <p class="text-sm">Clicca questo tab dopo aver avviato l'analisi per caricare i dati canale.</p>
+        <p class="text-xs opacity-60">Il calcolo per canale richiede qualche secondo in più.</p>
+      </div>
+      <div id="canali-loading" class="hidden flex flex-col items-center justify-center py-16 text-white/30 gap-3">
+        <i data-lucide="loader" class="w-8 h-8 animate-spin text-secondary"></i>
+        <p class="text-sm">Calcolo canali in corso...</p>
+      </div>
+      <div id="canali-content" class="hidden">
+
+        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4 mb-4">
+          <div class="chart-container">
+            <div class="chart-title">
+              <i data-lucide="crosshair" class="w-3.5 h-3.5 text-accent"></i>
+              NPS Focus vs Penetrazione Focus
+              <span class="chart-info">
+                <i data-lucide="info"></i>
+                <span class="tip">Scatter per canale: asse X = penetrazione (reach), asse Y = NPS (soddisfazione esposti). Quadrante alto-destra = canali prioritari con alto reach e alta soddisfazione.</span>
+              </span>
+            </div>
+            <div id="chart-canali-scatter" style="height:420px"></div>
+          </div>
+          <div class="chart-container">
+            <div class="chart-title">
+              <i data-lucide="bar-chart-2" class="w-3.5 h-3.5 text-secondary"></i>
+              Penetrazione: Focus vs Mercato
+              <span class="chart-info">
+                <i data-lucide="info"></i>
+                <span class="tip">Confronto diretto della penetrazione per canale tra azienda focus e mercato. Evidenzia su quali canali l'azienda sovra o sotto-performa il benchmark di mercato.</span>
+              </span>
+            </div>
+            <div id="chart-canali-pen-cmp" style="height:420px"></div>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="dark-table text-xs" id="table-canali">
+            <thead>
+              <tr>
+                <th>Canale</th>
+                <th class="text-accent">Pen F.</th>
+                <th class="text-warning">Pen C.</th>
+                <th class="text-blue-400">Pen M.</th>
+                <th class="text-accent">Ric F.</th>
+                <th class="text-warning">Ric C.</th>
+                <th class="text-blue-400">Ric M.</th>
+                <th class="text-accent">Ing F.</th>
+                <th class="text-warning">Ing C.</th>
+                <th class="text-blue-400">Ing M.</th>
+                <th class="text-accent">NPS F.</th>
+                <th class="text-warning">NPS C.</th>
+                <th class="text-blue-400">NPS M.</th>
+              </tr>
+            </thead>
+            <tbody id="tbody-canali"></tbody>
+          </table>
+        </div>
+      </div><!-- /canali-content -->
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 4 — FOCUS vs COMPETITOR (4 canali chiave)
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-vs-competitor" class="tab-panel hidden space-y-4">
+
+    <!-- Header descrittivo -->
+    <div class="kpi-card p-4">
+      <div class="flex items-center gap-2.5 mb-2">
+        <div class="w-8 h-8 rounded-xl bg-secondary/15 border border-secondary/20 flex items-center justify-center flex-shrink-0">
+          <i data-lucide="git-compare" class="w-4 h-4 text-secondary"></i>
+        </div>
+        <div>
+          <div class="text-white font-semibold text-sm" id="vs-title-label">Focus vs Competitor — Canali Chiave</div>
+          <div class="text-white/40 text-[11px] mt-0.5">
+            Confronto <strong class="text-white/60">Penetrazione · Ricordo · Ingaggio</strong>
+            per ISF F2F · ISF Webcall · Email da ISF · E-mail Aziendali — max 5 competitor individuali
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Placeholder pre-analisi -->
+    <div id="vs-placeholder" class="kpi-card flex flex-col items-center justify-center py-14 text-center">
+      <i data-lucide="git-compare" class="w-10 h-10 text-white/15 mb-3"></i>
+      <div class="text-white/30 text-sm">Avvia l'analisi per visualizzare il confronto per canale</div>
+      <div class="text-white/20 text-xs mt-1">Seleziona azienda + almeno 1 competitor</div>
+    </div>
+
+    <!-- Loading spinner -->
+    <div id="vs-loading" class="hidden kpi-card flex items-center justify-center py-14 gap-2 text-accent text-sm">
+      <i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Calcolo in corso...
+    </div>
+
+    <!-- Contenuto: 4 canali in griglia 2×2 -->
+    <div id="vs-content" class="hidden">
+      <div class="grid grid-cols-1 xl:grid-cols-2 gap-4" id="vs-channels-grid"></div>
+    </div>
+
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════
+       TAB 5 — DOWNLOAD
+  ══════════════════════════════════════════════════════ -->
+  <div id="tab-download" class="tab-panel hidden">
+    <div class="kpi-card max-w-lg">
+      <div class="chart-title mb-4">
+        <i data-lucide="file-down" class="w-4 h-4 text-secondary"></i>
+        Export Excel — KPI Performance
+      </div>
+      <div class="space-y-2 text-sm text-white/50 mb-5">
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-accent"></i> Sheet: Penetrazione / Ricordo / Ingaggio / NPS — Azienda</div>
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-warning"></i> Sheet: Penetrazione / Ricordo / Ingaggio / NPS — Competitor</div>
+        <div class="flex items-center gap-2"><i data-lucide="check-circle" class="w-3.5 h-3.5 text-blue-400"></i> Sheet: Penetrazione / Ricordo / Ingaggio / NPS — Mercato</div>
+        <div class="flex items-center gap-2 text-white/30"><i data-lucide="info" class="w-3.5 h-3.5"></i> Canali normalizzati via mappa_canali_labels</div>
+      </div>
+      <div id="export-warn" class="hidden mb-4 flex items-center gap-2 text-xs text-warning/80 bg-warning/10 border border-warning/20 rounded-lg px-3 py-2">
+        <i data-lucide="alert-triangle" class="w-3.5 h-3.5"></i>
+        Seleziona prima un'azienda focus prima di scaricare.
+      </div>
+      <button id="btn-export"
+        class="flex items-center gap-2 px-5 py-2.5 bg-secondary hover:bg-secondary/80 text-white font-medium rounded-lg transition-colors text-sm">
+        <i data-lucide="download" class="w-4 h-4"></i>
+        Scarica Excel
+      </button>
+    </div>
+  </div>
+
+</div><!-- /space-y-4 -->
+{% endblock %}
+
+
+{% block scripts %}
+<script>
+// ═══════════════════════════════════════════════════════
+// MODULO 2 — JavaScript
+// ═══════════════════════════════════════════════════════
+
+let currentAzienda     = '';
+let currentCompetitors = [];
+let currentTargets     = [];
+let kpiData    = null;
+let tabData    = null;
+let canaliData = null;
+let canaliLoaded  = false;
+let canaliLoading = false;
+let vsData    = null;
+let vsLoaded  = false;
+let vsLoading = false;
+
+// ── Colori Plotly dark ────────────────────────────────
+const C = {
+  accent:    '#00A896',
+  secondary: '#028090',
+  warning:   '#F77F00',
+  success:   '#02C39A',
+  blue:      '#60a5fa',
+  bg:        'rgba(0,0,0,0)',
+  grid:      'rgba(255,255,255,0.05)',
+  text:      'rgba(255,255,255,0.5)',
+};
+
+const PALETTE_COMP = [
+  '#F77F00','#fb923c','#fcd34d','#fdba74','#fda4af',
+  '#f472b6','#c084fc','#a78bfa','#818cf8','#60a5fa'
+];
+
+function baseLayout(extra = {}) {
+  return {
+    paper_bgcolor: C.bg, plot_bgcolor: C.bg,
+    font: { family: 'Inter, sans-serif', size: 11, color: C.text },
+    xaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    yaxis: { gridcolor: C.grid, zerolinecolor: C.grid, tickfont: { size: 10 } },
+    margin: { t: 20, r: 20, b: 50, l: 170 },
+    hoverlabel: {
+      bgcolor:     '#0d1117',
+      bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+    showlegend: false,
+    ...extra
+  };
+}
+
+function plot(divId, traces, layout) {
+  Plotly.newPlot(divId, traces, layout, { responsive: true, displayModeBar: false });
+}
+
+// ── Helpers ───────────────────────────────────────────
+function fmt(v, dec = 1) {
+  if (v == null || isNaN(parseFloat(v))) return '—';
+  return parseFloat(v).toFixed(dec);
+}
+
+function deltaHtml(az, merc) {
+  if (az == null || merc == null || isNaN(az) || isNaN(merc)) return '';
+  const d = az - merc;
+  const cls = d >= 0 ? 'text-success' : 'text-red-400';
+  return `<span class="${cls} text-xs font-medium">${d >= 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+}
+
+function avgOf(arr, col) {
+  if (!arr || !arr.length) return null;
+  const vals = arr.map(r => r[col]).filter(v => v != null && !isNaN(v));
+  return vals.length ? vals.reduce((s, v) => s + v, 0) / vals.length : null;
+}
+
+// ──────────────────────────────────────────────────────
+// EMPTY STATE / RESULTS / INSUFFICIENT DATA TOGGLE
+// ──────────────────────────────────────────────────────
+function showResults() {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.add('hidden');
+  document.getElementById('tab-container').classList.remove('hidden');
+}
+
+function showInsufficientData(nHcp, azienda, targets) {
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('insufficient-state').classList.remove('hidden');
+  document.getElementById('tab-container').classList.add('hidden');
+  document.getElementById('kpi-summary').classList.add('hidden');
+
+  // Badge conteggio HCP
+  const plural = nHcp === 1 ? 'HCP rilevato' : 'HCP rilevati';
+  document.getElementById('insuf-badge').textContent = `${azienda}: ${nHcp} ${plural}`;
+
+  // Badge header
+  const badge = document.getElementById('hcp-badge');
+  badge.textContent = nHcp + ' HCP';
+  badge.classList.remove('hidden');
+
+  // Status bar — icona warning arancione (isOk=false)
+  const statusEl = document.getElementById('load-status');
+  statusEl.className = 'hidden text-xs text-warning flex items-center gap-1.5';
+  document.getElementById('load-status-icon').setAttribute('data-lucide', 'alert-triangle');
+  const spec = targets.length ? ' · ' + targets.join(', ') : '';
+  setLoadStatus(`Campione insufficiente · ${azienda}${spec}`, false);
+  lucide.createIcons();
+}
+
+function setLoadStatus(text, isOk = true) {
+  const hint   = document.getElementById('load-hint');
+  const status = document.getElementById('load-status');
+  hint.classList.add('hidden');
+  status.classList.remove('hidden');
+  if (isOk) {
+    status.className = 'text-xs text-accent flex items-center gap-1.5';
+    document.getElementById('load-status-icon').setAttribute('data-lucide', 'check-circle');
+    lucide.createIcons();
+  }
+  document.getElementById('load-status-text').textContent = text;
+}
+
+// ────────────────────────────────────────────────────────
+// GRAFICI KPI — TAB 1
+// ────────────────────────────────────────────────────────
+
+function renderBarH(divId, data, col, color, suffix = '%') {
+  if (!data || !data.length) return;
+  // Sort ascendente → il valore MAX appare in cima nelle barre orizzontali Plotly
+  const rows   = [...data].sort((a, b) => (a[col] || 0) - (b[col] || 0));
+  const canali = rows.map(r => r['Canale']);
+  const vals   = rows.map(r => r[col]);
+  plot(divId, [{
+    type: 'bar', orientation: 'h',
+    x: vals, y: canali,
+    marker: { color, opacity: 0.85 },
+    text: vals.map(v => v != null ? v.toFixed(1) + suffix : ''),
+    textposition: 'outside',
+    hovertemplate: `<b>%{y}</b><br>${col}: %{x:.1f}${suffix}<extra></extra>`,
+  }], baseLayout({ margin: { t: 20, r: 80, b: 30, l: 190 } }));
+}
+
+function renderCompetitorGrouped(data) {
+  if (!data || !data.length) {
+    document.getElementById('wrap-pen-comp').classList.add('hidden');
+    return;
+  }
+  document.getElementById('wrap-pen-comp').classList.remove('hidden');
+
+  const aziende = [...new Set(data.map(r => r['Azienda']))];
+  const canali  = [...new Set(data.map(r => r['Canale']))];
+
+  const traces = aziende.map((az, i) => {
+    const vals = canali.map(c => {
+      const row = data.find(r => r['Azienda'] === az && r['Canale'] === c);
+      return row ? row['Penetrazione (%)'] : null;
+    });
+    return {
+      type: 'bar', orientation: 'h', name: az,
+      x: vals, y: canali,
+      marker: { color: PALETTE_COMP[i % PALETTE_COMP.length], opacity: 0.8 },
+      hovertemplate: `<b>${az}</b><br>%{y}: %{x:.1f}%<extra></extra>`,
+    };
+  });
+
+  plot('chart-pen-comp', traces, baseLayout({
+    barmode: 'group', showlegend: true,
+    legend: { orientation: 'h', y: -0.15, font: { size: 10 }, bgcolor: 'transparent' },
+    margin: { t: 20, r: 20, b: 80, l: 190 },
+  }));
+}
+
+// ── Focus vs Mercato grouped bar (orizzontale, per canale) ──────────────────
+function renderFocusMercatoBar(id, azData, mercData, colAz, colMerc, xLabel) {
+  if (!azData || !mercData) return;
+  const azMap = {}, mercMap = {};
+  azData.forEach(r   => { if (r['Canale']) azMap[r['Canale']]   = r[colAz];   });
+  mercData.forEach(r => { if (r['Canale']) mercMap[r['Canale']] = r[colMerc]; });
+
+  // unione canali, ordina per valore Focus crescente (Plotly mette in cima il più alto)
+  const canali = [...new Set([
+    ...azData.map(r => r['Canale']),
+    ...mercData.map(r => r['Canale']),
+  ])].filter(Boolean);
+  canali.sort((a, b) => (azMap[a] || 0) - (azMap[b] || 0));
+
+  plot(id, [
+    { type: 'bar', orientation: 'h', name: 'Azienda Focus',
+      x: canali.map(c => azMap[c]   ?? null), y: canali,
+      marker: { color: C.accent, opacity: 0.85 },
+      hovertemplate: '<b>%{y}</b><br>Focus: %{x:.1f}%<extra></extra>' },
+    { type: 'bar', orientation: 'h', name: 'Mercato',
+      x: canali.map(c => mercMap[c] ?? null), y: canali,
+      marker: { color: C.blue, opacity: 0.5 },
+      hovertemplate: '<b>%{y}</b><br>Mercato: %{x:.1f}%<extra></extra>' },
+  ], baseLayout({
+    barmode: 'group', showlegend: true,
+    xaxis: { title: { text: xLabel, font: { size: 11 } }, range: [0, 105] },
+    legend: { orientation: 'h', y: -0.15, font: { size: 10 }, bgcolor: 'transparent' },
+    margin: { t: 20, r: 20, b: 70, l: 190 },
+  }));
+}
+
+// ── Propensione Focus vs Mercato (distribuzione 3 box) ──────────────────────
+function renderPropFocusMercato(id, propAz, propMerc) {
+  if (!propAz || !propMerc) return;
+  const segments = [
+    { key: 'Top box 9-10 (%)', label: 'Top box 9–10',  color: C.accent },
+    { key: 'Medio 7-8 (%)',    label: 'Medio 7–8',     color: '#a78bfa' },
+    { key: 'Basso 1-6 (%)',    label: 'Basso 1–6',     color: C.warning },
+  ];
+  const cats = segments.map(s => s.label);
+
+  plot(id, [
+    { type: 'bar', name: 'Azienda Focus',
+      x: cats, y: segments.map(s => propAz[s.key]   ?? null),
+      marker: { color: C.accent, opacity: 0.85 },
+      hovertemplate: '<b>%{x}</b><br>Focus: %{y:.1f}%<extra></extra>' },
+    { type: 'bar', name: 'Mercato',
+      x: cats, y: segments.map(s => propMerc[s.key] ?? null),
+      marker: { color: C.blue, opacity: 0.5 },
+      hovertemplate: '<b>%{x}</b><br>Mercato: %{y:.1f}%<extra></extra>' },
+  ], baseLayout({
+    barmode: 'group', showlegend: true,
+    yaxis: { title: { text: '%', font: { size: 11 } }, range: [0, 105] },
+    legend: { orientation: 'h', y: -0.08, font: { size: 10 }, bgcolor: 'transparent' },
+    margin: { t: 20, r: 20, b: 70, l: 60 },
+    annotations: [{
+      x: 0.5, y: 1.04, xref: 'paper', yref: 'paper',
+      text: `Media propensione — Focus: <b>${propAz['Media propensione'] ?? '—'}</b> &nbsp;|&nbsp; Mercato: <b>${propMerc['Media propensione'] ?? '—'}</b>`,
+      showarrow: false, font: { size: 10, color: 'rgba(255,255,255,0.45)' },
+    }],
+  }));
+}
+
+function renderKpiTab(data) {
+  renderFocusMercatoBar('chart-pen-fvm', data.pen_az,  data.pen_merc, 'Penetrazione (%)',    'Penetrazione (%)',    'Penetrazione (%)');
+  renderFocusMercatoBar('chart-ric-fvm', data.ric_az,  data.ric_merc, 'Ricorda (%)',         'Ricorda (%)',         'Ricordo (%)');
+  renderFocusMercatoBar('chart-ing-fvm', data.ing_az,  data.ing_merc, 'Ingaggio totale (%)', 'Ingaggio totale (%)', 'Ingaggio (%)');
+  renderPropFocusMercato('chart-prop-fvm', data.prop_az, data.prop_merc);
+  renderCompetitorGrouped(data.pen_comp);
+}
+
+// ────────────────────────────────────────────────────────
+// TABELLONE — TAB 2
+// ────────────────────────────────────────────────────────
+
+function renderTabellone(data, azienda) {
+  if (!data || !data.length) return;
+  document.getElementById('tab-label-az').textContent = azienda || '';
+
+  function norm(r) {
+    const kpi = r['KPI'];
+    const az  = r['Azienda Focus'];
+    const co  = r['Competitor'];
+    const me  = r['Mercato'];
+    if (kpi === 'NPS') return {
+      az: az != null ? (az + 100) / 2 : null,
+      co: co != null ? (co + 100) / 2 : null,
+      me: me != null ? (me + 100) / 2 : null,
+    };
+    if (kpi === 'Propensione media') return {
+      az: az != null ? az * 10 : null,
+      co: co != null ? co * 10 : null,
+      me: me != null ? me * 10 : null,
+    };
+    return { az, co, me };
+  }
+
+  const kpiNames = data.map(r => r['KPI']);
+  const normed   = data.map(norm);
+  const close    = arr => [...arr, arr[0]];
+  const kpiClose = [...kpiNames, kpiNames[0]];
+
+  plot('chart-radar', [
+    { type:'scatterpolar', fill:'toself', name: azienda || 'Azienda',
+      r: close(normed.map(n => n.az)), theta: kpiClose,
+      fillcolor: C.accent + '33', line: { color: C.accent, width: 2 } },
+    { type:'scatterpolar', fill:'toself', name:'Competitor',
+      r: close(normed.map(n => n.co)), theta: kpiClose,
+      fillcolor: C.warning + '22', line: { color: C.warning, width: 2, dash: 'dash' } },
+    { type:'scatterpolar', fill:'toself', name:'Mercato',
+      r: close(normed.map(n => n.me)), theta: kpiClose,
+      fillcolor: C.blue + '22', line: { color: C.blue, width: 2, dash: 'dot' } },
+  ], {
+    paper_bgcolor: C.bg, plot_bgcolor: C.bg,
+    font: { family: 'Inter, sans-serif', size: 11, color: C.text },
+    polar: {
+      bgcolor: 'rgba(255,255,255,0.02)',
+      radialaxis: { visible: true, range: [0, 100], color: C.text, gridcolor: C.grid, tickfont: { size: 9 } },
+      angularaxis: { tickfont: { size: 11 }, color: C.text, gridcolor: C.grid },
+    },
+    showlegend: true,
+    legend: { orientation: 'h', x: 0.5, xanchor: 'center', y: -0.05, bgcolor: 'transparent', font: { size: 11 } },
+    margin: { t: 20, r: 60, b: 60, l: 60 },
+    hoverlabel: {
+      bgcolor:     '#0d1117',
+      bordercolor: '#00A896',
+      font: { family: 'Inter, sans-serif', size: 12, color: 'rgba(255,255,255,0.92)' },
+      align: 'left',
+    },
+  });
+
+  const tbody = document.getElementById('tbody-tab');
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const az   = r['Azienda Focus'];
+    const merc = r['Mercato'];
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="font-medium text-white/80">${r['KPI']}</td>
+      <td class="text-accent font-semibold">${fmt(az)}</td>
+      <td class="text-warning">${fmt(r['Competitor'])}</td>
+      <td class="text-blue-400">${fmt(merc)}</td>
+      <td>${deltaHtml(az, merc)}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ────────────────────────────────────────────────────────
+// CANALI ENHANCED — TAB 3
+// ────────────────────────────────────────────────────────
+
+function renderCanaliEnhanced(data) {
+  if (!data || !data.length) return;
+
+  const sc_x  = data.map(r => r['Pen Focus (%)']);
+  const sc_y  = data.map(r => r['NPS Focus (esposti)']);
+  const sc_lb = data.map(r => r['Canale']);
+
+  const validX = sc_x.filter(v => v != null);
+  const validY = sc_y.filter(v => v != null);
+  const medPen = validX.length ? validX.reduce((s,v) => s+v, 0) / validX.length : 50;
+  const medNPS = validY.length ? validY.reduce((s,v) => s+v, 0) / validY.length : 0;
+
+  plot('chart-canali-scatter', [
+    { type:'scatter', mode:'lines', x:[medPen,medPen], y:[-110,110],
+      line:{color:C.grid, width:1, dash:'dot'}, hoverinfo:'skip', showlegend:false },
+    { type:'scatter', mode:'lines', x:[0,105], y:[medNPS,medNPS],
+      line:{color:C.grid, width:1, dash:'dot'}, hoverinfo:'skip', showlegend:false },
+    { type:'scatter', mode:'markers+text',
+      x: sc_x, y: sc_y, text: sc_lb,
+      textposition:'top center', textfont:{ size:9, color: C.text },
+      marker:{ color: C.accent, size:10, opacity:0.85, line:{ color:'white', width:1 } },
+      hovertemplate:'<b>%{text}</b><br>Pen: %{x:.1f}%<br>NPS: %{y:.1f}<extra></extra>',
+      showlegend:false,
+    },
+  ], baseLayout({
+    xaxis: { title:{ text:'Penetrazione Focus (%)', font:{size:11} }, range:[0,105] },
+    yaxis: { title:{ text:'NPS Focus (esposti)', font:{size:11} } },
+    margin: { t:20, r:20, b:60, l:70 },
+  }));
+
+  // Bar Pen Focus vs Mercato — sort ascendente (max in cima per Plotly horizontal)
+  const rows   = [...data].sort((a, b) => (a['Pen Focus (%)'] || 0) - (b['Pen Focus (%)'] || 0));
+  const canali = rows.map(r => r['Canale']);
+  plot('chart-canali-pen-cmp', [
+    { type:'bar', orientation:'h', name:'Azienda Focus',
+      x: rows.map(r => r['Pen Focus (%)']), y: canali,
+      marker:{ color: C.accent, opacity:0.85 },
+      hovertemplate:'<b>%{y}</b><br>Focus: %{x:.1f}%<extra></extra>' },
+    { type:'bar', orientation:'h', name:'Mercato',
+      x: rows.map(r => r['Pen Merc (%)']), y: canali,
+      marker:{ color: C.blue, opacity:0.5 },
+      hovertemplate:'<b>%{y}</b><br>Mercato: %{x:.1f}%<extra></extra>' },
+  ], baseLayout({
+    barmode:'group', showlegend:true,
+    legend:{ orientation:'h', y:-0.15, font:{size:10}, bgcolor:'transparent' },
+    margin:{ t:20, r:20, b:80, l:190 },
+  }));
+
+  const tbody = document.getElementById('tbody-canali');
+  tbody.innerHTML = '';
+  data.forEach(r => {
+    const npsCell = v => {
+      if (v == null || isNaN(parseFloat(v))) return '<span class="text-white/20">—</span>';
+      const n = parseFloat(v);
+      const cls = n >= 0 ? 'text-success' : 'text-red-400';
+      return `<span class="${cls}">${n>=0?'+':''}${n.toFixed(1)}</span>`;
+    };
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="font-medium text-white/80 whitespace-nowrap">${r['Canale'] || '—'}</td>
+      <td class="text-accent">${fmt(r['Pen Focus (%)'])}</td>
+      <td class="text-warning">${fmt(r['Pen Competitor (%)'])}</td>
+      <td class="text-blue-400">${fmt(r['Pen Merc (%)'])}</td>
+      <td class="text-accent">${fmt(r['Ricordo Focus (%)'])}</td>
+      <td class="text-warning">${fmt(r['Ricordo Competitor (%)'])}</td>
+      <td class="text-blue-400">${fmt(r['Ricordo Mercato (%)'])}</td>
+      <td class="text-accent">${fmt(r['Ingaggio Focus (%)'])}</td>
+      <td class="text-warning">${fmt(r['Ingaggio Competitor (%)'])}</td>
+      <td class="text-blue-400">${fmt(r['Ingaggio Mercato (%)'])}</td>
+      <td>${npsCell(r['NPS Focus (esposti)'])}</td>
+      <td>${npsCell(r['NPS Competitor (esposti)'])}</td>
+      <td>${npsCell(r['NPS Mercato (esposti)'])}</td>
+    `;
+    tbody.appendChild(tr);
+  });
+}
+
+// ────────────────────────────────────────────────────────
+// SUMMARY CARDS
+// ────────────────────────────────────────────────────────
+
+function renderSummary(data) {
+  document.getElementById('kpi-summary').classList.remove('hidden');
+
+  const penAz   = avgOf(data.pen_az,   'Penetrazione (%)');
+  const penMerc = avgOf(data.pen_merc, 'Penetrazione (%)');
+  const ricAz   = avgOf(data.ric_az,   'Ricorda (%)');
+  const ricMerc = avgOf(data.ric_merc, 'Ricorda (%)');
+  const ingAz   = avgOf(data.ing_az,   'Ingaggio totale (%)');
+  const ingMerc = avgOf(data.ing_merc, 'Ingaggio totale (%)');
+
+  const propAz   = data.prop_az   ? data.prop_az['Media propensione']   : null;
+  const propMerc = data.prop_merc ? data.prop_merc['Media propensione'] : null;
+  const npsAz    = data.nps_az    ? data.nps_az['NPS']                  : null;
+  const npsMerc  = data.nps_merc  ? data.nps_merc['NPS']                : null;
+
+  document.getElementById('ks-pen-az').textContent    = penAz   != null ? penAz.toFixed(1)   + '%' : '—';
+  document.getElementById('ks-pen-merc').textContent  = penMerc != null ? penMerc.toFixed(1) + '%' : '—';
+  document.getElementById('ks-pen-delta').innerHTML   = deltaHtml(penAz, penMerc);
+  document.getElementById('ks-ric-az').textContent    = ricAz   != null ? ricAz.toFixed(1)   + '%' : '—';
+  document.getElementById('ks-ric-merc').textContent  = ricMerc != null ? ricMerc.toFixed(1) + '%' : '—';
+  document.getElementById('ks-ric-delta').innerHTML   = deltaHtml(ricAz, ricMerc);
+  document.getElementById('ks-ing-az').textContent    = ingAz   != null ? ingAz.toFixed(1)   + '%' : '—';
+  document.getElementById('ks-ing-merc').textContent  = ingMerc != null ? ingMerc.toFixed(1) + '%' : '—';
+  document.getElementById('ks-ing-delta').innerHTML   = deltaHtml(ingAz, ingMerc);
+  document.getElementById('ks-prop-az').textContent   = propAz   != null ? propAz.toFixed(1)   : '—';
+  document.getElementById('ks-prop-merc').textContent = propMerc != null ? propMerc.toFixed(1) : '—';
+  document.getElementById('ks-nps-az').textContent    = npsAz   != null ? (npsAz  >=0?'+':'') + npsAz.toFixed(1)   : '—';
+  document.getElementById('ks-nps-merc').textContent  = npsMerc != null ? (npsMerc>=0?'+':'') + npsMerc.toFixed(1) : '—';
+
+  const badge = document.getElementById('hcp-badge');
+  if (data.n_hcp_az != null) {
+    badge.textContent = data.n_hcp_az.toLocaleString('it-IT') + ' HCP azienda';
+    badge.classList.remove('hidden');
+  }
+}
+
+// ────────────────────────────────────────────────────────
+// LOAD DATA
+// ────────────────────────────────────────────────────────
+
+async function loadData() {
+  const azienda     = document.getElementById('sel-azienda').value.trim();
+  const competitors = Array.from(document.getElementById('sel-competitor').selectedOptions).map(o => o.value);
+  const targets     = Array.from(document.getElementById('sel-spec').selectedOptions).map(o => o.value);
+
+  if (!azienda) {
+    const hint = document.getElementById('load-hint');
+    hint.classList.remove('hidden');
+    hint.innerHTML = '&#9888; <span class="text-warning/80">Seleziona un\'azienda focus prima di procedere.</span>';
+    return;
+  }
+
+  currentAzienda     = azienda;
+  currentCompetitors = competitors;
+  currentTargets     = targets;
+
+  // Reset lazy load canali
+  canaliLoaded  = false;
+  canaliLoading = false;
+  canaliData    = null;
+  document.getElementById('canali-placeholder').classList.remove('hidden');
+  document.getElementById('canali-loading').classList.add('hidden');
+  document.getElementById('canali-content').classList.add('hidden');
+
+  // Reset lazy load vs-competitor
+  vsLoaded  = false;
+  vsLoading = false;
+  vsData    = null;
+  document.getElementById('vs-placeholder').classList.remove('hidden');
+  document.getElementById('vs-loading').classList.add('hidden');
+  document.getElementById('vs-content').classList.add('hidden');
+
+  const body = { azienda, competitors, target: targets };
+
+  const btn = document.getElementById('btn-load');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Analisi in corso...';
+  document.getElementById('load-hint').classList.add('hidden');
+  document.getElementById('load-status').classList.add('hidden');
+  lucide.createIcons();
+
+  try {
+    const [resKpi, resTab] = await Promise.all([
+      fetch('/modulo2/api/kpi',     { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => r.json()),
+      fetch('/modulo2/api/compare', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => r.json()),
+    ]);
+
+    // ── Campione insufficiente ────────────────────────
+    if (resKpi.insufficient_data) {
+      showInsufficientData(resKpi.n_hcp_az, resKpi.azienda, targets);
+      return;
+    }
+
+    if (resKpi.error) { console.error('KPI:', resKpi.error); setLoadStatus('Errore: ' + resKpi.error, false); return; }
+    if (resTab.error) { console.warn('Compare:', resTab.error); }
+
+    kpiData = resKpi;
+    tabData = resTab.tabellone;
+
+    // Mostra risultati (nasconde empty/insufficient, rivela tab bar)
+    showResults();
+    renderSummary(kpiData);
+    renderKpiTab(kpiData);
+    renderTabellone(tabData, azienda);
+
+    if (!document.querySelector('.tab-btn.active')) {
+      document.querySelector('[data-tab="kpi"]').click();
+    }
+
+    // Status bar verde
+    const hcpLabel  = resKpi.n_hcp_az ? resKpi.n_hcp_az.toLocaleString('it-IT') + ' HCP' : 'dati caricati';
+    const specLabel = targets.length ? ' · ' + targets.join(', ') : '';
+    setLoadStatus(`${azienda} — ${hcpLabel}${specLabel}`, true);
+
+  } catch (err) {
+    console.error('Errore di rete:', err);
+    const hint = document.getElementById('load-hint');
+    hint.classList.remove('hidden');
+    hint.textContent = 'Errore di connessione. Riprova.';
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="play-circle" class="w-4 h-4"></i> Avvia Analisi';
+    lucide.createIcons();
+  }
+}
+
+// ────────────────────────────────────────────────────────
+// CANALI ENHANCED — caricamento lazy (solo al click tab)
+// ────────────────────────────────────────────────────────
+
+async function loadCanali() {
+  if (canaliLoaded || canaliLoading) return;
+  if (!currentAzienda) return;
+
+  canaliLoading = true;
+  document.getElementById('canali-placeholder').classList.add('hidden');
+  document.getElementById('canali-loading').classList.remove('hidden');
+  document.getElementById('canali-content').classList.add('hidden');
+
+  const body = { azienda: currentAzienda, competitors: currentCompetitors, target: currentTargets };
+
+  try {
+    const res = await fetch('/modulo2/api/canali', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => r.json());
+
+    if (res.error) {
+      document.getElementById('canali-loading').classList.add('hidden');
+      document.getElementById('canali-placeholder').innerHTML =
+        `<i data-lucide="alert-triangle" class="w-8 h-8 text-warning/50"></i><p class="text-sm text-warning/70">${res.error}</p>`;
+      document.getElementById('canali-placeholder').classList.remove('hidden');
+      lucide.createIcons();
+      return;
+    }
+
+    canaliData   = res.canali;
+    canaliLoaded = true;
+    document.getElementById('canali-loading').classList.add('hidden');
+    document.getElementById('canali-content').classList.remove('hidden');
+    renderCanaliEnhanced(canaliData);
+
+  } catch (err) {
+    document.getElementById('canali-loading').classList.add('hidden');
+    document.getElementById('canali-placeholder').classList.remove('hidden');
+    console.error('Errore canali:', err);
+  } finally {
+    canaliLoading = false;
+  }
+}
+
+// ────────────────────────────────────────────────────────
+// FOCUS vs COMPETITOR — caricamento lazy (solo al click tab)
+// ────────────────────────────────────────────────────────
+
+// Palette: focus=teal, 5 competitor con colori distinti
+const VS_COLORS = {
+  focus: '#00A896',
+  comp:  ['#6366f1', '#f59e0b', '#ec4899', '#10b981', '#ef4444'],
+};
+
+async function loadVsCompetitor() {
+  if (vsLoaded || vsLoading) return;
+  if (!currentAzienda) return;
+
+  vsLoading = true;
+  document.getElementById('vs-placeholder').classList.add('hidden');
+  document.getElementById('vs-loading').classList.remove('hidden');
+  document.getElementById('vs-content').classList.add('hidden');
+
+  const body = { azienda: currentAzienda, competitors: currentCompetitors, target: currentTargets };
+  try {
+    const res = await fetch('/modulo2/api/vs_competitor', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    }).then(r => r.json());
+
+    if (res.error) {
+      document.getElementById('vs-loading').classList.add('hidden');
+      document.getElementById('vs-placeholder').innerHTML =
+        `<i data-lucide="alert-triangle" class="w-8 h-8 text-warning/50 mb-2"></i>
+         <p class="text-sm text-warning/70">${res.error}</p>`;
+      document.getElementById('vs-placeholder').classList.remove('hidden');
+      lucide.createIcons();
+      return;
+    }
+
+    vsData   = res;
+    vsLoaded = true;
+    document.getElementById('vs-loading').classList.add('hidden');
+    document.getElementById('vs-content').classList.remove('hidden');
+    renderVsCompetitor(vsData);
+
+  } catch (err) {
+    document.getElementById('vs-loading').classList.add('hidden');
+    document.getElementById('vs-placeholder').classList.remove('hidden');
+    console.error('Errore vs_competitor:', err);
+  } finally {
+    vsLoading = false;
+  }
+}
+
+/**
+ * renderVsCompetitor(data)
+ * Per ciascuno dei 4 canali target: card con grouped bar chart (Pen/Ric/Ing)
+ * + mini tabella delta vs focus.
+ */
+function renderVsCompetitor(data) {
+  const { azienda, competitors, canali, data: byChannel } = data;
+  const entities = [azienda, ...competitors];
+
+  // Icone per canale (Lucide)
+  const chanIcons = {
+    'ISF Faccia a Faccia': 'user-round',
+    'ISF Webcall':         'video',
+    'Email da ISF':        'mail',
+    'E-mail Aziendali':    'building-2',
+  };
+
+  const grid = document.getElementById('vs-channels-grid');
+  grid.innerHTML = canali.map((canale, idx) =>
+    `<div class="chart-container">
+       <div class="chart-title mb-2">
+         <i data-lucide="${chanIcons[canale] || 'wifi'}" class="w-3.5 h-3.5 text-secondary"></i>
+         ${canale}
+       </div>
+       <div id="vs-chart-${idx}" style="height:${Math.max(160, entities.length * 48 + 60)}px"></div>
+       <div id="vs-table-${idx}" class="mt-3 overflow-x-auto"></div>
+     </div>`
+  ).join('');
+  lucide.createIcons();
+
+  const kpiDefs = [
+    { key: 'pen', label: 'Penetrazione', color: '#00A896' },
+    { key: 'ric', label: 'Ricordo',      color: '#028090' },
+    { key: 'ing', label: 'Ingaggio',     color: '#6366f1' },
+  ];
+
+  canali.forEach((canale, idx) => {
+    const ch = byChannel[canale] || {};
+
+    // ── Grouped bar chart ──
+    // Tracce: una per KPI; y = entità, x = valore
+    const traces = kpiDefs.map(kpi => ({
+      type:        'bar',
+      orientation: 'h',
+      name:        kpi.label,
+      y:           entities,
+      x:           entities.map(e => ch[e]?.[kpi.key] ?? null),
+      marker:      { color: kpi.color, opacity: 0.82 },
+      text:        entities.map(e => {
+        const v = ch[e]?.[kpi.key];
+        return v != null ? v.toFixed(1) + '%' : 'n.d.';
+      }),
+      textposition:  'outside',
+      cliponaxis:    false,
+      hovertemplate: `<b>%{y}</b><br>${kpi.label}: %{x:.1f}%<extra></extra>`,
+    }));
+
+    const layout = baseLayout({
+      barmode: 'group',
+      margin:  { t: 10, r: 55, b: 35, l: 155 },
+      yaxis:   { tickfont: { size: 9.5 }, automargin: true },
+      xaxis:   { range: [0, 115], gridcolor: C.grid, ticksuffix: '%' },
+      legend:  { orientation: 'h', y: -0.28, font: { size: 9 }, bgcolor: 'rgba(0,0,0,0)' },
+    });
+    Plotly.newPlot(`vs-chart-${idx}`, traces, layout, { responsive: true, displayModeBar: false });
+
+    // ── Mini tabella delta ──
+    document.getElementById(`vs-table-${idx}`).innerHTML = _buildVsTable(azienda, competitors, ch);
+  });
+}
+
+function _buildVsTable(azienda, competitors, ch) {
+  const entities   = [azienda, ...competitors];
+  const focusEntry = ch[azienda] || {};
+
+  const delta = (val, focusVal, isFocus) => {
+    if (isFocus || focusVal == null || val == null) return '';
+    const d = val - focusVal;
+    const cls = d > 1 ? 'text-success' : d < -1 ? 'text-red-400' : 'text-white/35';
+    return `<span class="${cls} text-[9px] ml-0.5">${d >= 0 ? '+' : ''}${d.toFixed(1)}</span>`;
+  };
+
+  const rows = entities.map(e => {
+    const d = ch[e] || {};
+    const isFocus = e === azienda;
+    const rowBase = isFocus
+      ? 'text-accent font-semibold bg-accent/5'
+      : 'text-white/65 hover:bg-white/3';
+    const indicator = isFocus
+      ? `<span class="w-2 h-2 rounded-full bg-accent inline-block mr-1.5 flex-shrink-0"></span>`
+      : `<span class="w-2 h-2 rounded-full bg-white/20 inline-block mr-1.5 flex-shrink-0"></span>`;
+    return `<tr class="${rowBase} transition-colors">
+      <td class="py-1.5 pl-2 pr-3 text-[11px] whitespace-nowrap">
+        <span class="flex items-center gap-0">${indicator}${e}</span>
+      </td>
+      <td class="text-center text-[11px] px-2">
+        ${d.pen != null ? d.pen.toFixed(1) + '%' : '<span class="text-white/25">—</span>'}
+        ${delta(d.pen, focusEntry.pen, isFocus)}
+      </td>
+      <td class="text-center text-[11px] px-2">
+        ${d.ric != null ? d.ric.toFixed(1) + '%' : '<span class="text-white/25">—</span>'}
+        ${delta(d.ric, focusEntry.ric, isFocus)}
+      </td>
+      <td class="text-center text-[11px] px-2">
+        ${d.ing != null ? d.ing.toFixed(1) + '%' : '<span class="text-white/25">—</span>'}
+        ${delta(d.ing, focusEntry.ing, isFocus)}
+      </td>
+      <td class="text-center text-[11px] px-2 text-white/35">
+        ${d.n_hcp != null ? d.n_hcp.toLocaleString('it-IT') : '—'}
+      </td>
+    </tr>`;
+  }).join('');
+
+  return `<table class="w-full text-[10px] border-collapse">
+    <thead>
+      <tr class="text-white/30 text-[10px] border-b border-white/8">
+        <th class="text-left py-1.5 pl-2 pr-3 font-medium">Azienda</th>
+        <th class="text-center px-2 font-medium">Pen.</th>
+        <th class="text-center px-2 font-medium">Ric.</th>
+        <th class="text-center px-2 font-medium">Ing.</th>
+        <th class="text-center px-2 font-medium text-white/20">N HCP</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ────────────────────────────────────────────────────────
+// DOWNLOAD EXCEL
+// ────────────────────────────────────────────────────────
+
+async function downloadExcel() {
+  if (!currentAzienda) {
+    document.getElementById('export-warn').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('export-warn').classList.add('hidden');
+
+  const btn = document.getElementById('btn-export');
+  btn.disabled = true;
+  btn.innerHTML = '<i data-lucide="loader" class="w-4 h-4 animate-spin"></i> Preparazione...';
+  lucide.createIcons();
+
+  try {
+    const body = { azienda: currentAzienda, competitors: currentCompetitors, target: currentTargets };
+    const res = await fetch('/modulo2/export', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: 'Errore server' }));
+      alert('Errore export: ' + (err.error || res.statusText));
+      return;
+    }
+    const blob  = await res.blob();
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    const label = `${currentAzienda}_Performance`.replace(/\s+/g, '_');
+    a.href     = url;
+    a.download = `MCM_Performance_${label}.xlsx`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  } catch (err) {
+    alert('Errore download: ' + err.message);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '<i data-lucide="download" class="w-4 h-4"></i> Scarica Excel';
+    lucide.createIcons();
+  }
+}
+
+// ────────────────────────────────────────────────────────
+// INIT
+// ────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  initTabs('tab-container');
+  lucide.createIcons();
+
+  document.getElementById('sel-competitor').addEventListener('change', function () {
+    const n = this.selectedOptions.length;
+    document.getElementById('warn-competitor').classList.toggle('hidden', n <= {{ max_competitor }});
+  });
+
+  document.getElementById('btn-load').addEventListener('click', loadData);
+  document.getElementById('btn-export').addEventListener('click', downloadExcel);
+
+  // Lazy load canali al click sul tab
+  document.querySelector('[data-tab="canali"]').addEventListener('click', function () {
+    setTimeout(() => {
+      if (currentAzienda && !canaliLoaded && !canaliLoading) loadCanali();
+    }, 50);
+  });
+
+  // Lazy load Focus vs Competitor al click sul tab
+  document.querySelector('[data-tab="vs-competitor"]').addEventListener('click', function () {
+    setTimeout(() => {
+      if (currentAzienda && !vsLoaded && !vsLoading) loadVsCompetitor();
+    }, 50);
+  });
+});
+</script>
+{% endblock %}

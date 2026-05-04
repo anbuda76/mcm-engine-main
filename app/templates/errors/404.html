@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Pagina non trovata{% endblock %}
+{% block page_title %}Errore 404{% endblock %}
+
+{% block content %}
+<div class="flex flex-col items-center justify-center min-h-[60vh] text-center px-4">
+
+  <!-- Icona grande -->
+  <div class="w-20 h-20 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center mb-6 shadow-glow-card">
+    <i data-lucide="file-question" class="w-10 h-10 text-white/20"></i>
+  </div>
+
+  <!-- Codice errore -->
+  <div class="text-7xl font-bold text-white/5 leading-none mb-3 select-none">404</div>
+
+  <!-- Titolo -->
+  <h1 class="text-xl font-semibold text-white/70 mb-2">Pagina non trovata</h1>
+  <p class="text-sm text-white/35 max-w-sm mb-8">
+    La pagina che cerchi non esiste o è stata spostata.
+    Usa la navigazione laterale per tornare ai moduli.
+  </p>
+
+  <!-- Azioni -->
+  <div class="flex items-center gap-3">
+    <a href="{{ url_for('dashboard.index') }}"
+      class="flex items-center gap-2 px-5 py-2.5 bg-accent hover:bg-accent/80 text-white font-medium rounded-xl transition-all text-sm shadow-lg shadow-accent/20">
+      <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+      Dashboard
+    </a>
+    <button onclick="history.back()"
+      class="flex items-center gap-2 px-5 py-2.5 bg-white/6 hover:bg-white/10 text-white/60 hover:text-white font-medium rounded-xl transition-all text-sm border border-white/10">
+      <i data-lucide="arrow-left" class="w-4 h-4"></i>
+      Indietro
+    </button>
+  </div>
+
+  <!-- Link rapidi -->
+  <div class="mt-10 flex items-center gap-6 text-xs text-white/25">
+    <a href="{{ url_for('modulo1.index') }}" class="hover:text-white/50 transition-colors flex items-center gap-1">
+      <i data-lucide="users-round" class="w-3.5 h-3.5"></i> Comportamento
+    </a>
+    <a href="{{ url_for('modulo2.index') }}" class="hover:text-white/50 transition-colors flex items-center gap-1">
+      <i data-lucide="bar-chart-3" class="w-3.5 h-3.5"></i> Performance
+    </a>
+    <a href="{{ url_for('trend.index') }}" class="hover:text-white/50 transition-colors flex items-center gap-1">
+      <i data-lucide="trending-up" class="w-3.5 h-3.5"></i> Trend
+    </a>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>lucide.createIcons();</script>
+{% endblock %}

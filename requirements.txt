@@ -1,0 +1,28 @@
+# ─── Web Framework ───────────────────────────────────────────
+Flask==3.0.3
+Flask-CORS==4.0.1
+Flask-Login==0.6.3
+Flask-SQLAlchemy==3.1.1
+
+# ─── Database ─────────────────────────────────────────────────
+psycopg2-binary>=2.9.9          # Driver PostgreSQL (Supabase)
+
+# ─── Data Processing ─────────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+openpyxl==3.1.2
+
+# ─── Visualization ───────────────────────────────────────────
+plotly==5.22.0
+
+# ─── Utilities ───────────────────────────────────────────────
+python-dotenv==1.0.1
+gunicorn==22.0.0
+
+# ─── PDF Report ──────────────────────────────────────────────
+fpdf2>=2.7.9                # Generazione PDF dark theme (report comportamento HCP)
+kaleido>=0.2.1              # Export Plotly → PNG per embedding nei PDF
+Pillow>=8.3.2               # Calcolo dimensioni immagini nel layout PDF
+
+# ─── AI / LLM ────────────────────────────────────────────────
+ollama                      # Ollama Python SDK (locale, deepseek-r1 / llama3.2)
