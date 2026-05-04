@@ -25,7 +25,7 @@ ALL_AGENTS  = ["comportamento", "performance"]
 
 
 class User(db.Model, UserMixin):
-    __tablename__ = "users"
+    __tablename__ = "mcm_users"
 
     id            = db.Column(db.Integer, primary_key=True)
     username      = db.Column(db.String(80), unique=True, nullable=False)

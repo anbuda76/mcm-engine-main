@@ -91,7 +91,7 @@ def _migrate_db(db):
 
     if dialect == "postgresql":
         migrations = [
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS agents TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE mcm_users ADD COLUMN IF NOT EXISTS agents TEXT NOT NULL DEFAULT '[]'",
         ]
         with db.engine.connect() as conn:
             for stmt in migrations:
@@ -100,7 +100,7 @@ def _migrate_db(db):
     else:
         # SQLite: ADD COLUMN IF NOT EXISTS non garantito su versioni vecchie
         migrations = [
-            "ALTER TABLE users ADD COLUMN agents TEXT NOT NULL DEFAULT '[]'",
+            "ALTER TABLE mcm_users ADD COLUMN agents TEXT NOT NULL DEFAULT '[]'",
         ]
         with db.engine.connect() as conn:
             for stmt in migrations:
