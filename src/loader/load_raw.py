@@ -15,8 +15,21 @@ def _postgres_url() -> str | None:
     return None
 
 
+def _optimize_memory(df: pd.DataFrame) -> pd.DataFrame:
+    """Riduce l'uso di memoria convertendo i tipi delle colonne."""
+    for col in df.select_dtypes(include=["object"]).columns:
+        n_unique = df[col].nunique()
+        if n_unique / max(len(df), 1) < 0.5:
+            df[col] = df[col].astype("category")
+    for col in df.select_dtypes(include=["float64"]).columns:
+        df[col] = pd.to_numeric(df[col], downcast="float")
+    for col in df.select_dtypes(include=["int64"]).columns:
+        df[col] = pd.to_numeric(df[col], downcast="integer")
+    return df
+
+
 def _load_from_db(db_url: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Legge df_beh e df_perf dalle tabelle Supabase via SQL diretto."""
+    """Legge df_beh e df_perf dalle tabelle Supabase con streaming per limitare la RAM."""
     import logging
     from sqlalchemy import create_engine, text
 
@@ -26,12 +39,19 @@ def _load_from_db(db_url: str) -> tuple[pd.DataFrame, pd.DataFrame]:
         connect_args={"sslmode": "require", "connect_timeout": 30},
     )
     try:
-        with engine.connect() as conn:
+        # stream_results=True: psycopg2 usa server-side cursor (fetch in batch, non tutto in RAM)
+        with engine.connect().execution_options(stream_results=True) as conn:
             df_beh  = pd.read_sql(text("SELECT * FROM comportamento_hcp"),   conn)
             df_perf = pd.read_sql(text("SELECT * FROM performance_channel"), conn)
+
+        df_beh  = _optimize_memory(df_beh)
+        df_perf = _optimize_memory(df_perf)
+
         logging.info(
-            "[MCM] DB loaded — comportamento_hcp: %d rows, performance_channel: %d rows",
-            len(df_beh), len(df_perf),
+            "[MCM] DB loaded — comportamento_hcp: %d rows (%.1f MB), "
+            "performance_channel: %d rows (%.1f MB)",
+            len(df_beh),  df_beh.memory_usage(deep=True).sum()  / 1e6,
+            len(df_perf), df_perf.memory_usage(deep=True).sum() / 1e6,
         )
     except Exception:
         logging.exception("[MCM] Errore caricamento dati da Supabase")
