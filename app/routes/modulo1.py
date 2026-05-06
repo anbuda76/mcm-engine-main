@@ -16,7 +16,7 @@ Route file:
   POST /modulo1/export        → download Excel multi-sheet
 """
 
-import sys, os, io, json
+import sys, os, io, json, logging
 import pandas as pd
 from flask import Blueprint, render_template, request, jsonify, send_file
 from flask_login import login_required, current_user
@@ -126,12 +126,16 @@ def _normalizza_df(df):
 @modulo1_bp.route("/")
 @login_required
 def index():
-    specs = current_user.filter_targets(get_specializzazioni())
+    try:
+        specs = current_user.filter_targets(get_specializzazioni())
+    except Exception as e:
+        logging.exception("[MCM] modulo1/index: errore caricamento dati")
+        specs = []
     return render_template(
         "modulo1/index.html",
         active_page="modulo1",
         specializzazioni=specs,
-        aree_terapeutiche=AREE_CANONICHE,   # sempre tutte e 13, ordine ATC fisso
+        aree_terapeutiche=AREE_CANONICHE,
         n_canali=len(set(CANALI_MAP.values())),
     )
 
