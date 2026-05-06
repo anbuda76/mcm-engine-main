@@ -1,1 +1,1 @@
-web: gunicorn -w 4 -b 0.0.0.0:$PORT "app:create_app()"
+web: gunicorn -w 2 -b 0.0.0.0:$PORT --timeout 120 "app:create_app()"
