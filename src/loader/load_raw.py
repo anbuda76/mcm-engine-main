@@ -16,12 +16,26 @@ def _postgres_url() -> str | None:
 
 
 def _load_from_db(db_url: str) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Legge df_beh e df_perf dalle tabelle Supabase."""
-    from sqlalchemy import create_engine
-    engine = create_engine(db_url)
+    """Legge df_beh e df_perf dalle tabelle Supabase via SQL diretto."""
+    import logging
+    from sqlalchemy import create_engine, text
+
+    engine = create_engine(
+        db_url,
+        pool_pre_ping=True,
+        connect_args={"sslmode": "require", "connect_timeout": 30},
+    )
     try:
-        df_beh  = pd.read_sql_table("comportamento_hcp",   engine)
-        df_perf = pd.read_sql_table("performance_channel", engine)
+        with engine.connect() as conn:
+            df_beh  = pd.read_sql(text("SELECT * FROM comportamento_hcp"),   conn)
+            df_perf = pd.read_sql(text("SELECT * FROM performance_channel"), conn)
+        logging.info(
+            "[MCM] DB loaded — comportamento_hcp: %d rows, performance_channel: %d rows",
+            len(df_beh), len(df_perf),
+        )
+    except Exception:
+        logging.exception("[MCM] Errore caricamento dati da Supabase")
+        raise
     finally:
         engine.dispose()
     return df_beh, df_perf
