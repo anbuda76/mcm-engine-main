@@ -71,20 +71,6 @@ def create_app(env=None):
         _migrate_db(db)          # aggiunge colonne nuove su tabelle esistenti
         _create_default_admin(app, db)
 
-    # ─── Pre-carica dati in background al primo avvio ────────────
-    import threading
-
-    def _preload_data():
-        with app.app_context():
-            try:
-                from app.data_cache import get_data
-                get_data()
-                print("[MCM] Dati pre-caricati in cache all'avvio.")
-            except Exception as e:
-                print(f"[MCM] Pre-caricamento dati fallito: {e}")
-
-    threading.Thread(target=_preload_data, daemon=True).start()
-
     # ─── Error handlers ──────────────────────────────────────
     @app.errorhandler(404)
     def not_found(e):
